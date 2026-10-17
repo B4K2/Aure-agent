@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <style>
+    .bg{fill:#0d1117}
+    .box{fill:#161b22;stroke:#30363d;stroke-width:2;rx:10}
+    .t{fill:#e6edf3;font-size:14px;font-weight:600;text-anchor:middle}
+    .s{fill:#8b949e;font-size:11px;text-anchor:middle}
+    .wire{stroke:#30363d;stroke-width:2;fill:none}
+    .hl{fill:none;stroke:#58a6ff;stroke-width:3;rx:10;opacity:0;animation:glow 12s infinite}
+    @keyframes glow{0%,100%{opacity:0}3%,12%{opacity:1}16%{opacity:0}}
+    .d1{animation-delay:0s}.d2{animation-delay:1.7s}.d3{animation-delay:3.4s}.d4{animation-delay:5.1s}
+    .d5{animation-delay:6.8s}.d6{animation-delay:8.5s}.d7{animation-delay:10.2s}
+    .alert{fill:#f85149;font-size:12px;font-weight:600;opacity:0;animation:pop 12s infinite}
+    .ok{fill:#3fb950;font-size:12px;font-weight:600;opacity:0;animation:pop 12s infinite;animation-delay:10.2s}
+    @keyframes pop{0%,100%{opacity:0}2%,14%{opacity:1}18%{opacity:0}}
+  </style>
+  <rect class="bg" width="900" height="300" rx="12"/>
+  <text x="450" y="30" class="t" style="font-size:16px">Aura — incident lifecycle</text>
+
+  <!-- top row -->
+  <path class="wire" d="M180 95 H230 M380 95 H430 M580 95 H630 M705 125 V175 M630 205 H580 M430 205 H380"/>
+  <g>
+    <rect class="box" x="30"  y="65" width="150" height="60"/><text class="t" x="105" y="92">Observe</text><text class="s" x="105" y="110">health · metrics · logs</text>
+    <rect class="box" x="230" y="65" width="150" height="60"/><text class="t" x="305" y="92">Enrich</text><text class="s" x="305" y="110">git diff · memory</text>
+    <rect class="box" x="430" y="65" width="150" height="60"/><text class="t" x="505" y="92">Reason</text><text class="s" x="505" y="110">root cause · confidence</text>
+    <rect class="box" x="630" y="65" width="150" height="60"/><text class="t" x="705" y="92">Notify</text><text class="s" x="705" y="110">proposed fix</text>
+    <rect class="box" x="630" y="175" width="150" height="60"/><text class="t" x="705" y="202">Human approval</text><text class="s" x="705" y="220">approve / reject / chat</text>
+    <rect class="box" x="430" y="175" width="150" height="60"/><text class="t" x="505" y="202">Execute</text><text class="s" x="505" y="220">rollback · restart · verify</text>
+    <rect class="box" x="230" y="175" width="150" height="60"/><text class="t" x="305" y="202">Learn</text><text class="s" x="305" y="220">store to Qdrant + Neo4j</text>
+  </g>
+  <rect class="hl d1" x="30"  y="65"  width="150" height="60"/>
+  <rect class="hl d2" x="230" y="65"  width="150" height="60"/>
+  <rect class="hl d3" x="430" y="65"  width="150" height="60"/>
+  <rect class="hl d4" x="630" y="65"  width="150" height="60"/>
+  <rect class="hl d5" x="630" y="175" width="150" height="60"/>
+  <rect class="hl d6" x="430" y="175" width="150" height="60"/>
+  <rect class="hl d7" x="230" y="175" width="150" height="60"/>
+
+  <!-- moving packet -->
+  <circle r="7" fill="#58a6ff">
+    <animateMotion dur="12s" repeatCount="indefinite"
+      keyPoints="0;0;0.2;0.2;0.4;0.4;0.6;0.6;0.7;0.7;0.85;0.85;1;1" keyTimes="0;0.08;0.14;0.22;0.28;0.36;0.42;0.5;0.56;0.64;0.7;0.78;0.85;1" calcMode="linear"
+      path="M105 140 H305 H505 H705 V250 H505 H305"/>
+  </circle>
+
+  <text class="alert" x="105" y="55" text-anchor="middle">⚠ checkout 5xx spike</text>
+  <text class="ok" x="305" y="265" text-anchor="middle">✔ resolved · memory updated</text>
+  <text class="s" x="450" y="290">Nothing destructive runs without human approval</text>
+</svg>

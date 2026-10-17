@@ -5,6 +5,8 @@ past incidents from memory, forms a root-cause hypothesis, and proposes a fix. *
 runs without human approval.** Every resolved (or rejected) incident is written back into memory,
 so diagnosis gets faster and more confident over time.
 
+<p align="center"><img src="docs/aura-pipeline.svg" alt="Aura agent pipeline animation" width="900"></p>
+
 ```
  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
  │ Observability│──▶│  Enrichment  │──▶│  Reasoning   │──▶│ Notification │
