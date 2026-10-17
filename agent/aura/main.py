@@ -17,8 +17,11 @@ from langgraph.types import Command
 
 from . import config
 from .agents.conversation import Conversation
+from .agents.enrichment import enrichment_node
 from .agents.execution import dry_run
+from .agents.notification import notification_node
 from .agents.observability import Observer
+from .agents.reasoning import reasoning_node
 from .graph import build
 from .state import audit, now
 
@@ -120,14 +123,19 @@ class Aura:
             self.locks[iid] = threading.Lock()
             self.emit({"type": "incident_opened", "incident_id": iid})
             threading.Thread(target=self._debounce_then_run, args=(iid,), daemon=True).start()
+        new_types = False
         for a in anomalies:
             key = a["metric_name"]
             if key in inc["seen"]:
                 continue  # same signal still firing; already on the incident
+            new_types |= a["signal_type"] not in {x["signal_type"] for x in inc["anomalies_detected"]}
             inc["seen"].add(key)
             inc["anomalies_detected"].append(a)
             self.emit({"type": "anomaly", "incident_id": inc["incident_id"], "anomaly": a,
                        "late": inc["status"] != "collecting"})
+        if new_types and inc["status"] == "awaiting_approval" and \
+                inc.get("rca", {}).get("proposed_action", {}).get("type") == "investigate_further":
+            threading.Thread(target=self._reanalyze, args=(inc["incident_id"],), daemon=True).start()
 
     def _open_incident(self) -> dict | None:
         """§12: one open incident per service absorbs new anomalies. An open incident is always still being
@@ -147,6 +155,39 @@ class Aura:
                    **audit("observability", "detect", "; ".join(a["raw_excerpt"].split("\n")[0][:80]
                                                                 for a in inc["anomalies_detected"][:6]))}
         self._stream(iid, initial)
+
+    def _reanalyze(self, iid: str) -> None:
+        """A new signal type arrived while the incident sits on an advisory proposal (usually: low confidence
+        for lack of corroboration). Re-run enrichment → reasoning → notification with everything seen so far,
+        so it can reach a real fix without a human having to ask."""
+        lock = self.locks[iid]
+        if not lock.acquire(blocking=False):
+            return  # a decision or another re-analysis is running
+        try:
+            inc = self.incidents[iid]
+            if inc["status"] != "awaiting_approval":
+                return
+            cfg = {"configurable": {"thread_id": iid}}
+            self.emit({"type": "stage", "incident_id": iid, "stage": "analyzing",
+                       "detail": f"new evidence: re-analyzing {len(inc['anomalies_detected'])} anomalies"})
+            st = {**self.graph.get_state(cfg).values, "anomalies_detected": list(inc["anomalies_detected"]),
+                  "raw_signals": {**self.observer.last_signals, "filtered_logs": list(self.observer.filtered_logs)[-40:]}}
+            trail = []
+            for node in (enrichment_node, reasoning_node, notification_node):
+                upd = node(st)
+                trail += upd.pop("audit_trail", [])
+                st.update(upd)
+            keys = ("anomalies_detected", "raw_signals", "deployment_context", "correlation", "retrieved_memories",
+                    "rca", "notification", "dry_run")
+            self.graph.update_state(cfg, {**{k: st[k] for k in keys if k in st}, "audit_trail": trail})
+            seen = inc["seen"]
+            inc.update(self.graph.get_state(cfg).values)
+            inc["seen"] = seen
+            self.emit({"type": "action_changed", "incident": self._full(inc)})
+        except Exception:
+            log.exception("re-analysis failed for %s", iid)
+        finally:
+            lock.release()
 
     def _stream(self, iid: str, inp) -> None:
         cfg = {"configurable": {"thread_id": iid}}
