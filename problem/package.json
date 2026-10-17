@@ -1,0 +1,13 @@
+{
+  "name": "void-problems",
+  "private": true,
+  "type": "module",
+  "description": "Failure injection + virtual-user traffic for the VOID test website",
+  "scripts": {
+    "inject": "node inject.js",
+    "traffic": "node traffic/simulate.js"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
+}

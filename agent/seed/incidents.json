@@ -1,0 +1,20 @@
+[
+  {"incident_id": "SEED-001", "root_cause_type": "bad_deploy", "resolved_by": "rollback", "confirmed": true, "days_ago": 40,
+   "symptoms": "5xx rate 60% on POST /api/orders right after deploy; log: column \"total_price\" does not exist",
+   "hypothesis": "A deploy renamed a column in the orders INSERT; checkout fails with a SQL error"},
+  {"incident_id": "SEED-002", "root_cause_type": "db_connection_exhaustion", "resolved_by": "terminate_db_sessions", "confirmed": true, "days_ago": 75,
+   "symptoms": "/api/health timeout; 97/100 Postgres connections in use, most by application_name=nightly-export; no recent deploy",
+   "hypothesis": "A batch export job held almost every Postgres connection slot so the app could not get connections"},
+  {"incident_id": "SEED-003", "root_cause_type": "bad_deploy", "resolved_by": "nothing (hypothesis rejected)", "confirmed": false, "days_ago": 20,
+   "symptoms": "rps 4x baseline, p95 latency 1.8s, no 5xx, a docs-only commit 12 minutes earlier",
+   "hypothesis": "The latest deploy made product listing slow; roll it back"},
+  {"incident_id": "SEED-004", "root_cause_type": "traffic_spike", "resolved_by": "investigate_further", "confirmed": true, "days_ago": 19,
+   "symptoms": "rps 4x baseline, p95 latency 1.8s, no 5xx, no code change related to the slow routes",
+   "hypothesis": "Marketing email caused a traffic spike; load, not a regression"},
+  {"incident_id": "SEED-005", "root_cause_type": "db_outage", "resolved_by": "start_db", "confirmed": true, "days_ago": 300,
+   "symptoms": "/api/health unreachable, ECONNREFUSED 127.0.0.1:5433, db container exited",
+   "hypothesis": "Postgres container stopped during host maintenance; app crashed with it"},
+  {"incident_id": "SEED-006", "root_cause_type": "db_lock", "resolved_by": "terminate_db_sessions", "confirmed": true, "days_ago": 120,
+   "symptoms": "checkout hangs, health ok, 14 sessions waiting on locks, AccessExclusiveLock on orders held 6 min by an idle in transaction session",
+   "hypothesis": "A manual migration left a transaction open holding an exclusive lock on orders"}
+]
