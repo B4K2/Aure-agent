@@ -29,7 +29,8 @@ sessions: `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE applicat
 
 # Lock contention / hanging writes
 Checkout or stats hang while reads work; pg_locks shows an AccessExclusiveLock held for a long time by a
-session in "idle in transaction". Terminate that session (by application_name). Migrations must not run
+session that is "idle in transaction" or stuck in a long statement. Even one request blocked for 10s+ is
+enough to hang a page; pg_blocking_pids() names the blocker. Terminate that session (by application_name). Migrations must not run
 long transactions against hot tables during traffic.
 
 # Slow query

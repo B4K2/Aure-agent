@@ -18,9 +18,15 @@ MIN_SD_FRAC = 0.15  # a very steady baseline would make tiny moves look like 20�
 
 # A candidate only becomes an anomaly after this many consecutive polls (5 s each). Short blips — a burst of
 # new users doing full page loads, one slow request — never page anyone.
-SUSTAIN = {"health": 2, "db_container": 1, "db_reachable": 2, "error_logs": 2}
+SUSTAIN = {"health": 2, "db_container": 1, "db_reachable": 2, "error_logs": 2,
+           "pg_lock_waits": 1}  # LOCK_WAIT_LONG_S already filters blips
 SUSTAIN_DEFAULT = 3
 MIN_ERROR_LINES = 3  # per poll, for the log signal
+# A request stuck behind a lock never finishes, so it never shows up in latency, 5xx or the access log.
+# With light traffic there may be just one or two of them; how long they've waited is the signal.
+LOCK_WAIT_MIN = 3     # waiters, if the longest has waited LOCK_WAIT_SHORT_S
+LOCK_WAIT_SHORT_S = 2
+LOCK_WAIT_LONG_S = 10  # or a single waiter blocked this long
 
 # Regex pre-filter for the server log (§6 Log Analyzer): keep errors + 5xx access lines only.
 LOG_KEEP = re.compile(r"(Error|error:|ECONNREFUSED|ECONNRESET|timeout|terminat|FATAL|Unhandled|"
@@ -133,10 +139,23 @@ class Observer:
                 info["lock_waits"] = sum(r["lock_waits"] for r in info["sessions"])
                 info["exclusive_locks"] = [dict(zip(("application_name", "relation", "mode", "held_s"), r)) for r in c.execute("""
                     SELECT a.application_name, l.relation::regclass::text, l.mode,
-                           round(extract(epoch FROM now() - a.xact_start)::numeric, 1)
+                           round(extract(epoch FROM now() - a.xact_start)::numeric, 1)::float8
                       FROM pg_locks l JOIN pg_stat_activity a USING (pid)
                      WHERE l.granted AND l.mode = 'AccessExclusiveLock' AND l.relation IS NOT NULL
                        AND a.pid <> pg_backend_pid()""").fetchall()]
+                # Who is blocked, for how long, and by whom (so the reasoner can name the session to terminate).
+                info["blocked"] = [dict(zip(("waiter_app", "waited_s", "waiter_query", "blocker_pid", "blocker_app",
+                                             "blocker_state", "blocker_xact_s", "blocker_query"), r)) for r in c.execute("""
+                    SELECT coalesce(nullif(w.application_name, ''), '(none)'),
+                           round(extract(epoch FROM now() - w.query_start)::numeric, 1)::float8, left(w.query, 120),
+                           b.pid, coalesce(nullif(b.application_name, ''), '(none)'), b.state,
+                           round(extract(epoch FROM now() - b.xact_start)::numeric, 1)::float8, left(b.query, 120)
+                      FROM pg_stat_activity w
+                      CROSS JOIN LATERAL unnest(pg_blocking_pids(w.pid)) bp
+                      JOIN pg_stat_activity b ON b.pid = bp
+                     WHERE w.datname = current_database() AND w.wait_event_type = 'Lock'
+                     ORDER BY 2 DESC""").fetchall()]
+                info["longest_lock_wait_s"] = float(info["blocked"][0]["waited_s"]) if info["blocked"] else 0.0
                 info["reachable"] = True
         except Exception as e:
             info["reachable"] = False
@@ -189,8 +208,10 @@ class Observer:
         if db.get("max_connections") and db.get("total_sessions", 0) >= 0.9 * db["max_connections"]:
             found.append(_anomaly("metric", f"{db['total_sessions']}/{db['max_connections']} Postgres connections in use",
                                   "pg_sessions", db["total_sessions"], None, None))
-        if db.get("lock_waits", 0) >= 3:
-            found.append(_anomaly("metric", f"{db['lock_waits']} sessions waiting on locks; exclusive: {db.get('exclusive_locks')}",
+        longest = db.get("longest_lock_wait_s", 0)
+        if (db.get("lock_waits", 0) >= LOCK_WAIT_MIN and longest >= LOCK_WAIT_SHORT_S) or longest >= LOCK_WAIT_LONG_S:
+            found.append(_anomaly("metric", f"{db['lock_waits']} sessions waiting on locks, longest {db['longest_lock_wait_s']:.0f}s; "
+                                  f"blocked by: {db.get('blocked', [])[:5]}; exclusive: {db.get('exclusive_locks')}",
                                   "pg_lock_waits", db["lock_waits"], 0, None))
         if (metrics.get("error_rate_5xx") or 0) > 0.05 and (metrics.get("rps") or 0) > 0.2:
             found.append(_anomaly("metric", f"5xx rate {metrics['error_rate_5xx']:.1%} at {metrics['rps']:.1f} rps",
