@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Failure injection + virtual-user traffic for the VOID test website",
   "scripts": {
+    "setup-website": "node setup-website.js",
     "inject": "node inject.js",
     "traffic": "node traffic/simulate.js"
   },

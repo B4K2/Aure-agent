@@ -18,7 +18,7 @@ build/
 agent/neo4j_data/
 agent/qdrant_storage/
 
-# Nested repo (has its own .git)
+# Generated from problem/website-template by `npm run setup-website` (local-only git repo)
 test-website/
 
 # OS / editor
