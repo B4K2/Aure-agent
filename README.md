@@ -7,23 +7,6 @@ so diagnosis gets faster and more confident over time.
 
 <p align="center"><img src="docs/aura-pipeline.svg" alt="Aura agent pipeline animation" width="900"></p>
 
-```
- ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
- │ Observability│──▶│  Enrichment  │──▶│  Reasoning   │──▶│ Notification │
- │ health, logs,│   │ git diff,    │   │ structured   │   │ incident +   │
- │ metrics, DB, │   │ Qdrant +     │   │ RCA, conf.   │   │ proposed fix │
- │ docker       │   │ Neo4j memory │   │ threshold    │   │              │
- └──────────────┘   └──────────────┘   └──────────────┘   └──────┬───────┘
-                                                                 ▼
-                       ┌────────────┐  approve  ┌───────────────────────┐
-                       │ Execution  │◀──────────│ Human decision (HITL) │
-                       │ + verify   │           │ approve / reject/chat │
-                       └─────┬──────┘           └──────────┬────────────┘
-                             ▼                     reject  │
-                       ┌──────────────────────────────────▼┐
-                       │ Learning — stored back to memory  │
-                       └───────────────────────────────────┘
-```
 
 ## Repository layout
 
