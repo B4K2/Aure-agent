@@ -17,7 +17,7 @@ so diagnosis gets faster and more confident over time.
 | `problem/` | Failure injector + virtual-user traffic simulator for the demo site |
 | `aura-technical-reference.md` | Full design reference (state object, agents, metrics) |
 
-The demo target site (`test-website/`, "VOID" shop) is kept in its own repository and is not part of this one.
+The demo target site ("VOID" shop) lives in `problem/website-template/`. `npm run setup-website` copies it to `test-website/` (gitignored) and makes that a local-only git repo, so deploy scenarios can commit "bad pushes" for Aura to find.
 
 ## Quick start
 
@@ -33,8 +33,9 @@ docker compose up -d
 uv sync
 uv run python -m aura.memory.seed
 
-# 3. Start the demo site (in its own repo checkout at ../test-website)
-(cd ../test-website && docker compose up -d db && npm start)
+# 3. Create and start the demo site (test-website/ is generated, local-only git repo)
+(cd ../problem && npm install && npm run setup-website)
+(cd ../test-website && npm install && docker compose up -d db && npm start)
 
 # 4. Launch the UI (starts the agent server if it isn't running)
 cd ../aura-cli && npm install && npm start

@@ -3,8 +3,12 @@
 Breaks `test-website/` in realistic ways while simulated shoppers use it, so Aura has to detect,
 diagnose and fix real incidents and not just a synthetic API flood.
 
+The site's clean source is `website-template/`. `test-website/` is a generated copy with its own
+local git repo; `npm run setup-website -- --force` resets it to the template.
+
 ```bash
 cd problem && npm install
+npm run setup-website                     # once: website-template/ -> ../test-website (local git repo)
 npm run traffic -- --users 20             # baseline traffic (leave running in its own terminal)
 node inject.js list                       # scenarios
 node inject.js <scenario> [options]       # break something
@@ -55,7 +59,7 @@ Options: `--users N` (concurrent sessions), `--duration 10m` (default: until Ctr
 
 - **deploy**: exact find/replace edits to `test-website/server/index.js`, then the server restarts.
   Each apply/revert is logged to `.state/deploys.jsonl` (time, files, line counts, commit message).
-  If `test-website/` is a git repo, it is also committed with a normal-looking message, so Aura's
+  `test-website/` is a git repo (made by `npm run setup-website`), so it is also committed with a normal-looking message, so Aura's
   deployment fetcher can correlate it.
   Rolling back (`recover`, `git revert`, or the agent's own fix) plus a restart resolves it.
 - **process**: a detached background process (pid + log in `.state/`). The DB troublemakers set
