@@ -15,7 +15,7 @@ function plan(edits, reverse) {
     const file = path.join(WEBSITE_DIR, e.file);
     const src = files.get(file) ?? fs.readFileSync(file, 'utf8');
     const [from, to] = reverse ? [e.replace, e.find] : [e.find, e.replace];
-    if (!reverse && count(src, e.replace) === 1) { files.set(file, src); continue; } // already applied
+    if (count(src, to) === 1 && count(src, from) === 0) { files.set(file, src); continue; } // already applied / reverted
     if (count(src, from) !== 1)
       throw new Error(`${e.file}: expected exactly one match for edit, found ${count(src, from)}.\n` +
         `The website code changed since this scenario was written, or it is already ${reverse ? 'reverted' : 'applied'}.\n--- looking for ---\n${from}`);
