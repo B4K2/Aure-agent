@@ -43,7 +43,7 @@ export function suggestions(input: string, incidents: Record<string, Incident>, 
       out.push({ value: `/approve ${id}`, label: `/approve ${id}`, tone: 'action',
         hint: `run ${describe(action)}${conf != null ? ` (${Math.round(conf * 100)}%${low ? ', low confidence' : ''})` : ''}` });
     }
-    out.push({ value: `/reject ${id}`, label: `/reject ${id}`, tone: 'danger', hint: 'wrong diagnosis; Aura remembers it' });
+    out.push({ value: `/reject ${id} `, label: `/reject ${id} <why>`, tone: 'danger', hint: 'wrong diagnosis; say why, Aura remembers it' });
   }
   for (const b of BASE) {
     let hint = b.hint;

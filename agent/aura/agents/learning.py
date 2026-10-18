@@ -18,6 +18,8 @@ def learning_node(state: AuraState) -> dict:
     text = vector_db.incident_text(state["service"], rca["root_cause_type"], rca["hypothesis"],
                                    action if confirmed else f"nothing (hypothesis {state.get('human_decision')})",
                                    describe(state))
+    if state.get("human_note"):
+        text += f" human said: {state['human_note']}"
     errors = []
     try:
         vector_db.upsert_incidents([{"incident_id": state["incident_id"], "service": state["service"],

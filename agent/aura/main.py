@@ -84,7 +84,7 @@ class Aura:
 
     def _full(self, inc: dict) -> dict:
         keys = ("incident_id", "status", "opened_at", "anomalies_detected", "correlation", "rca", "notification",
-                "dry_run", "human_decision", "execution_result", "audit_trail")
+                "dry_run", "human_decision", "human_note", "execution_result", "audit_trail")
         return {k: inc.get(k) for k in keys}
 
     # ---------- watcher ----------
@@ -217,7 +217,7 @@ class Aura:
             self.last_closed = time.time()
             self.emit({"type": "closed", "incident": self._full(inc)})
 
-    def decide(self, iid: str, decision: str) -> None:
+    def decide(self, iid: str, decision: str, note: str = "") -> None:
         inc = self.incidents.get(iid)
         if not inc:
             raise HTTPException(404, "no such incident")
@@ -231,12 +231,16 @@ class Aura:
             lock.release()
             raise HTTPException(409, "nothing to approve: the proposal is advisory. Ask Aura to investigate "
                                      "(/investigate) so it can propose a real fix, or /reject.")
+        if decision == "rejected" and not note.strip():
+            lock.release()
+            raise HTTPException(400, "say why: /reject <reason>")
         inc["status"] = "executing" if decision == "approved" else "closing"
-        self.emit({"type": "stage", "incident_id": iid, "stage": inc["status"], "detail": decision})
+        self.emit({"type": "stage", "incident_id": iid, "stage": inc["status"],
+                   "detail": f"{decision}: {note}" if note else decision})
 
         def run():
             try:
-                self._stream(iid, Command(resume=decision))
+                self._stream(iid, Command(resume={"decision": decision, "note": note.strip()}))
             finally:
                 lock.release()
         self.pool.submit(run)
@@ -280,11 +284,11 @@ def incident(iid: str, request: Request):
 
 
 @api.post("/incidents/{iid}/{decision}")
-def decide(iid: str, decision: str, request: Request):
+def decide(iid: str, decision: str, request: Request, note: str = ""):
     _auth(request.headers.get("x-aura-token"))
     if decision not in ("approve", "reject"):
         raise HTTPException(400)
-    aura.decide(iid, "approved" if decision == "approve" else "rejected")
+    aura.decide(iid, "approved" if decision == "approve" else "rejected", note)
     return {"ok": True}
 
 
@@ -311,7 +315,7 @@ async def ws(sock: WebSocket):
                 await sock.send_json({"type": "answer", "text": answer, "at": now()})
             elif msg.get("type") == "decide":
                 try:
-                    aura.decide(msg["incident_id"], msg["decision"])
+                    aura.decide(msg["incident_id"], msg["decision"], msg.get("note") or "")
                 except HTTPException as e:
                     await sock.send_json({"type": "error", "message": e.detail, "at": now()})
             elif msg.get("type") == "get":

@@ -74,6 +74,7 @@ class AuraState(TypedDict, total=False):
     notification: str
     dry_run: str
     human_decision: Optional[Literal["approved", "rejected", "chatting"]]
+    human_note: str  # the human's reason, required on reject
     conversation_history: list[dict]
     execution_result: Optional[dict]
     audit_trail: Annotated[list[dict], operator.add]  # append-only
