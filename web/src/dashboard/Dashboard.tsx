@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Logo from '../components/Logo'
 import ThemeToggle from '../components/ThemeToggle'
 import Connect from './Connect'
+import Markdown from './Markdown'
 import MetricTile from './Sparkline'
 import { ADVISORY, CLOSED, type Beat, type Incident } from './types'
 import { useAura, type Status } from './useAura'
@@ -366,9 +367,11 @@ function Chat({ aura, incidentId }: { aura: ReturnType<typeof useAura>; incident
           m.role === 'tool' ? (
             <div key={m.id} className="truncate font-mono text-[11px] text-neutral-600">⏺ {m.text}</div>
           ) : (
-            <div key={m.id} className={m.role === 'user' ? 'ml-8 rounded-2xl rounded-br-sm bg-white px-4 py-2 text-black' : 'mr-4 whitespace-pre-wrap text-neutral-200'}>
-              {m.text}
-            </div>
+            m.role === 'user' ? (
+              <div key={m.id} className="ml-8 rounded-2xl rounded-br-sm bg-white px-4 py-2 whitespace-pre-wrap text-black">{m.text}</div>
+            ) : (
+              <div key={m.id} className="mr-2 break-words text-neutral-300"><Markdown text={m.text} /></div>
+            )
           ),
         )}
         {aura.thinking && (
