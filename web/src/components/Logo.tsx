@@ -1,4 +1,4 @@
-// Aura mark + wordmark. The satellite orbits the ring continuously while the core breathes.
+// Aura mark + wordmark. A planet travels along the ring (its orbit) while the core breathes.
 // On hover it adds a fast lap, drawing the ring behind it; on leave it laps back the other way.
 import { animate, motion, useAnimationFrame, useMotionValue, useTransform, type Variants } from 'motion/react'
 import { useEffect, useRef } from 'react'
@@ -49,18 +49,18 @@ export default function Logo({ size = 30 }: { size?: number }) {
     >
       <svg width={size} height={size} viewBox="0 0 32 32" fill="none" className="overflow-visible">
         <motion.circle
-          cx="16" cy="16" r="9.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+          cx="16" cy="16" r="11" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"
           style={{ ...center, pathLength: drawn, rotate: ringRotate }}
         />
         <motion.g variants={{ rest: { scale: 1 }, hover: { scale: 1.35 } }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} style={center}>
           <motion.circle
-            cx="16" cy="16" r="3" fill="currentColor" style={center}
+            cx="16" cy="16" r="4" fill="currentColor" style={center}
             animate={{ scale: [1, 0.7, 1] }}
             transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
           />
         </motion.g>
         <motion.g style={{ ...center, rotate: angle }}>
-          <circle cx="16" cy="1.5" r="2" fill="currentColor" />
+          <circle cx="16" cy="5" r="2.75" fill="currentColor" />
         </motion.g>
       </svg>
       <span className="flex">
