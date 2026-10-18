@@ -354,12 +354,13 @@ function IncidentDetail({ inc, stage, aura }: { inc: Incident; stage?: string; a
 
 function Chat({ aura, incidentId }: { aura: ReturnType<typeof useAura>; incidentId?: string }) {
   const [text, setText] = useState('')
-  const end = useRef<HTMLDivElement>(null)
-  useEffect(() => end.current?.scrollIntoView({ block: 'nearest' }), [aura.chat.length, aura.thinking])
+  const box = useRef<HTMLDivElement>(null)
+  // keep the newest message in view without scrolling the page itself
+  useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight }, [aura.chat.length, aura.thinking])
 
   return (
     <Panel title="Ask Aura" right={incidentId && <span className="font-mono text-[11px] text-neutral-600">{incidentId}</span>}>
-      <div className="h-72 space-y-3 overflow-y-auto p-4 text-sm">
+      <div ref={box} className="h-72 space-y-3 overflow-y-auto p-4 text-sm">
         {aura.chat.length === 0 && <p className="text-neutral-500">Ask why, what changed, or what happened last time.</p>}
         {aura.chat.map((m) =>
           m.role === 'tool' ? (
@@ -376,7 +377,6 @@ function Chat({ aura, incidentId }: { aura: ReturnType<typeof useAura>; incident
             {aura.thinking === 'thinking' ? 'Aura is thinking' : aura.thinking}
           </div>
         )}
-        <div ref={end} />
       </div>
       <form
         className="border-t border-white/10 p-3"
