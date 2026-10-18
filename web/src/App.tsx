@@ -1,11 +1,13 @@
 import { motion, useScroll, useTransform } from 'motion/react'
 import { useRef } from 'react'
 import CountUp from './components/CountUp'
+import Logo from './components/Logo'
 import Pipeline from './components/Pipeline'
 import Reveal from './components/Reveal'
 import SplitText from './components/SplitText'
 import SpotlightCard from './components/SpotlightCard'
 import Terminal from './components/Terminal'
+import ThemeToggle from './components/ThemeToggle'
 import Threads from './components/Threads'
 
 const REPO = 'https://github.com/B4K2/Aure-agent'
@@ -39,9 +41,7 @@ function Nav() {
     <header className="fixed inset-x-0 top-0 z-50 border-b border-white/5 bg-black/60 backdrop-blur-xl">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         <a href="#" className="flex items-center gap-2.5 text-[15px] font-medium tracking-tight">
-          <span className="relative grid size-5 place-items-center rounded-full border-[1.5px] border-white">
-            <span className="size-1.5 rounded-full bg-white" />
-          </span>
+          <Logo />
           Aura
         </a>
         <div className="hidden items-center gap-8 text-sm text-neutral-400 md:flex">
@@ -49,9 +49,12 @@ function Nav() {
           <a href="#features" className="transition-colors hover:text-white">Features</a>
           <a href="#demo" className="transition-colors hover:text-white">Demo</a>
         </div>
-        <a href={REPO} className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-black transition-opacity hover:opacity-85">
-          Get started
-        </a>
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <a href={REPO} className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-black transition-opacity hover:opacity-85">
+            Get started
+          </a>
+        </div>
       </nav>
     </header>
   )
@@ -71,16 +74,6 @@ function Hero() {
       </motion.div>
 
       <motion.div style={{ y }} className="relative z-10 mx-auto max-w-5xl text-center">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1 }}
-          className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-neutral-300"
-        >
-          <span className="size-1.5 animate-pulse rounded-full bg-white" />
-          <span className="shiny">Agentic SRE co-pilot</span>
-        </motion.div>
-
         <h1 className="text-[clamp(3rem,9vw,8.5rem)] leading-[0.92] font-light tracking-[-0.045em]">
           <SplitText text="Incidents," />
           <br />

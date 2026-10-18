@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/aura-logo.png" alt="Aura" width="480"></p>
+
 # Aura — Agentic SRE Co-pilot
 
 Aura watches a running app, detects anomalies, correlates them with recent deploys, recalls similar
