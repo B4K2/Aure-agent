@@ -5,6 +5,7 @@ import Spinner from 'ink-spinner';
 import TextInput from 'ink-text-input';
 import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { Backend, type AuraEvent } from './backend.js';
+import { Markdown } from './Markdown.js';
 import { StatePanel } from './StatePanel.js';
 import { suggestions } from './suggest.js';
 
@@ -13,7 +14,7 @@ type Incident = Record<string, any>;
 
 const HELP = `/approve [id]   run the proposed action (dry-run shown first)
 /investigate    let Aura dig in and propose a concrete fix
-/reject [id]    reject the hypothesis (Aura learns from it)
+/reject [id] <why>  reject with your reason (Aura learns from it)
 /focus <id>     chat about a specific incident (default: latest)
 /state          live graphs of site health (toggle)
 /incidents      list incidents        /show [id]   full RCA
@@ -120,7 +121,7 @@ export function App() {
         const res = inc.execution_result;
         const color = inc.status === 'resolved' ? 'green' : inc.status === 'rejected' ? 'gray' : 'yellow';
         push(<Box flexDirection="column">
-          <Text>{t}<Text color={color} bold>■ {inc.incident_id} {inc.status.toUpperCase()}</Text>{res ? ` — ${res.message}` : ' — hypothesis rejected, stored as negative memory'}</Text>
+          <Text>{t}<Text color={color} bold>■ {inc.incident_id} {inc.status.toUpperCase()}</Text>{res ? ` — ${res.message}` : ` — hypothesis rejected${inc.human_note ? ` ("${inc.human_note}")` : ''}, stored as negative memory`}</Text>
           {(res?.logs || []).slice(-4).map((l: string, i: number) => <Text key={i} dimColor>    {l.split('\n')[0]}</Text>)}
         </Box>);
         break;
@@ -134,7 +135,7 @@ export function App() {
         break;
       case 'answer':
         setBusy(null);
-        push(<Box marginBottom={1}><Text color="cyan">⏺ </Text><Text>{e.text}</Text></Box>);
+        push(<Box marginBottom={1}><Text color="cyan">⏺ </Text><Markdown text={e.text} /></Box>);
         break;
       case 'incident':
         if (e.incident) { upsert(e.incident); push(<Box flexDirection="column" paddingLeft={2}><Text bold>{e.incident.incident_id} · {e.incident.status}</Text>{e.incident.rca ? <Rca inc={e.incident} /> : <Text dimColor>no RCA yet</Text>}{(e.incident.audit_trail || []).map((a: any, i: number) => <Text key={i} dimColor>  {time(a.timestamp)} {a.node}: {a.output_summary}</Text>)}</Box>); }
@@ -175,12 +176,16 @@ export function App() {
     if (!text) return;
     push(<Text><Text color="gray">{'> '}</Text>{text}</Text>);
     if (!text.startsWith('/')) { backend.send({ type: 'chat', text, incident_id: target() }); setBusy('Aura is thinking'); return; }
-    const [cmd, arg] = text.slice(1).split(/\s+/);
+    const [cmd, ...words] = text.slice(1).split(/\s+/);
+    let arg: string | undefined = words[0];
+    if (cmd === 'reject' && arg && !incidents[arg]) arg = undefined;  // first word is the reason, not an id
+    const note = words.slice(arg ? 1 : 0).join(' ').trim();
     const id = target(arg);
     switch (cmd) {
       case 'approve': case 'reject':
         if (!id) return push(<Text color="yellow">no incident awaiting a decision</Text>);
-        backend.send({ type: 'decide', incident_id: id, decision: cmd === 'approve' ? 'approved' : 'rejected' });
+        if (cmd === 'reject' && !note) return push(<Text color="yellow">usage: /reject [id] &lt;why it's wrong&gt; — Aura stores your reason</Text>);
+        backend.send({ type: 'decide', incident_id: id, decision: cmd === 'approve' ? 'approved' : 'rejected', note });
         break;
       case 'focus':
         if (!arg) return push(<Text color="yellow">usage: /focus &lt;incident id&gt;</Text>);

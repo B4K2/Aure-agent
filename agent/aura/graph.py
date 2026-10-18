@@ -13,8 +13,10 @@ from .state import AuraState, audit
 
 def human_decision_node(state: AuraState) -> dict:
     """Pauses the graph until /approve or /reject. Chat happens outside the graph while paused."""
-    decision = interrupt({"incident_id": state["incident_id"], "proposed_action": state["rca"]["proposed_action"]})
-    return {"human_decision": decision, **audit("human_decision", decision, f"human {decision}")}
+    resume = interrupt({"incident_id": state["incident_id"], "proposed_action": state["rca"]["proposed_action"]})
+    decision, note = resume["decision"], resume.get("note", "")
+    return {"human_decision": decision, "human_note": note,
+            **audit("human_decision", decision, f"human {decision}" + (f": {note}" if note else ""))}
 
 
 def after_decision(state: AuraState) -> str:
