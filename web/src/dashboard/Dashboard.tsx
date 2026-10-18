@@ -65,7 +65,7 @@ function Console({ aura, onSignOut }: { aura: ReturnType<typeof useAura>; onSign
   const open = list.filter((i) => !CLOSED.has(i.status)).length
 
   return (
-    <div className="flex min-h-screen flex-col bg-black text-white">
+    <div className="flex min-h-screen flex-col bg-black text-white xl:h-screen xl:overflow-hidden">
       <header className="sticky top-0 z-40 border-b border-white/10 bg-black/70 backdrop-blur-xl">
         <div className="flex h-16 items-center justify-between px-6">
           <div className="flex items-center gap-6">
@@ -81,7 +81,7 @@ function Console({ aura, onSignOut }: { aura: ReturnType<typeof useAura>; onSign
         </div>
       </header>
 
-      <main className="flex-1 space-y-6 p-6">
+      <main className="flex min-h-0 flex-1 flex-col gap-6 p-6">
         <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <HealthTile health={last?.health} open={open} />
           <MetricTile label="Latency p95" values={beats.map((b) => b.p95)} times={times} format={ms} />
@@ -96,14 +96,14 @@ function Console({ aura, onSignOut }: { aura: ReturnType<typeof useAura>; onSign
           />
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[300px_1fr_360px]">
+        <section className="grid min-h-0 flex-1 gap-6 xl:grid-cols-[300px_minmax(0,1fr)_360px]">
           <IncidentList list={list} stages={aura.stages} focusId={focusId} onSelect={setSelected} />
           {focus ? (
             <IncidentDetail inc={focus} stage={aura.stages[focus.incident_id]} aura={aura} />
           ) : (
             <Empty />
           )}
-          <div className="flex flex-col gap-6">
+          <div className="flex min-h-0 flex-col gap-6">
             <Chat aura={aura} incidentId={focusId ?? undefined} />
             <Feed aura={aura} onSelect={setSelected} />
           </div>
@@ -137,7 +137,7 @@ function HealthTile({ health, open }: { health?: Beat['health']; open: number })
 
 function Panel({ title, children, className = '', right }: { title: string; children: React.ReactNode; className?: string; right?: React.ReactNode }) {
   return (
-    <div className={`flex min-h-0 flex-col rounded-2xl border border-white/10 bg-neutral-950 ${className}`}>
+    <div className={`flex min-h-0 min-w-0 flex-col rounded-2xl border border-white/10 bg-neutral-950 ${className}`}>
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
         <h2 className="text-xs font-medium tracking-widest text-neutral-500 uppercase">{title}</h2>
         {right}
@@ -160,7 +160,7 @@ function StatusBadge({ status, inverted }: { status: string; inverted?: boolean 
 function IncidentList({ list, stages, focusId, onSelect }: { list: Incident[]; stages: Record<string, string>; focusId: string | null; onSelect: (id: string) => void }) {
   return (
     <Panel title="Incidents" right={<span className="text-xs text-neutral-600">{list.length}</span>}>
-      <div className="max-h-[640px] overflow-y-auto p-2">
+      <div className="max-h-[640px] min-h-0 flex-1 overflow-y-auto p-2 xl:max-h-none">
         {list.length === 0 && <p className="p-4 text-sm text-neutral-500">Nothing yet. Aura is watching.</p>}
         <AnimatePresence initial={false}>
           {list.map((inc) => {
@@ -194,7 +194,7 @@ function IncidentList({ list, stages, focusId, onSelect }: { list: Incident[]; s
 
 function Empty() {
   return (
-    <div className="grid min-h-[400px] place-items-center rounded-2xl border border-dashed border-white/10 text-center">
+    <div className="grid min-h-[400px] place-items-center rounded-2xl xl:min-h-0 border border-dashed border-white/10 text-center">
       <div>
         <div className="text-2xl font-light">All quiet.</div>
         <p className="mt-2 text-sm text-neutral-500">Incidents will appear here the moment Aura spots one.</p>
@@ -219,7 +219,7 @@ function IncidentDetail({ inc, stage, aura }: { inc: Incident; stage?: string; a
       title="Incident"
       right={<span className="font-mono text-xs text-neutral-500">{inc.incident_id}</span>}
     >
-      <div className="space-y-8 p-6">
+      <div className="min-h-0 flex-1 space-y-8 overflow-y-auto p-6">
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge status={inc.status} />
           {stage && (
@@ -271,7 +271,7 @@ function IncidentDetail({ inc, stage, aura }: { inc: Incident; stage?: string; a
         {action && (
           <div className={`rounded-xl border p-5 ${awaiting ? 'border-white' : 'border-white/10'}`}>
             <div className="text-xs text-neutral-500">{advisory ? 'Suggested next step' : 'Proposed action'}</div>
-            <div className="mt-2 font-mono text-lg">
+            <div className="mt-2 font-mono text-lg break-all">
               {action.type} <span className="text-neutral-500">→</span> {action.target}
             </div>
             {awaiting && (
@@ -359,8 +359,8 @@ function Chat({ aura, incidentId }: { aura: ReturnType<typeof useAura>; incident
   useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight }, [aura.chat.length, aura.thinking])
 
   return (
-    <Panel title="Ask Aura" right={incidentId && <span className="font-mono text-[11px] text-neutral-600">{incidentId}</span>}>
-      <div ref={box} className="h-72 space-y-3 overflow-y-auto p-4 text-sm">
+    <Panel className="xl:min-h-0 xl:flex-[3]" title="Ask Aura" right={incidentId && <span className="font-mono text-[11px] text-neutral-600">{incidentId}</span>}>
+      <div ref={box} className="h-72 min-h-0 space-y-3 overflow-y-auto p-4 text-sm xl:h-auto xl:flex-1">
         {aura.chat.length === 0 && <p className="text-neutral-500">Ask why, what changed, or what happened last time.</p>}
         {aura.chat.map((m) =>
           m.role === 'tool' ? (
@@ -401,8 +401,8 @@ function Chat({ aura, incidentId }: { aura: ReturnType<typeof useAura>; incident
 function Feed({ aura, onSelect }: { aura: ReturnType<typeof useAura>; onSelect: (id: string) => void }) {
   const glyph = { incident: '●', anomaly: '▲', stage: '⎿', closed: '■', error: '✕', system: '·' }
   return (
-    <Panel title="Live feed">
-      <div className="max-h-80 overflow-y-auto p-3 font-mono text-[11px] leading-relaxed">
+    <Panel className="xl:min-h-0 xl:flex-[2]" title="Live feed">
+      <div className="max-h-80 min-h-0 flex-1 overflow-y-auto p-3 font-mono text-[11px] leading-relaxed xl:max-h-none">
         {aura.feed.length === 0 && <p className="p-2 text-neutral-500">Waiting for events…</p>}
         {aura.feed.map((f) => (
           <button
