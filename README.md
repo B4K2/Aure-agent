@@ -16,6 +16,7 @@ so diagnosis gets faster and more confident over time.
 |---|---|
 | `agent/` | Python LangGraph pipeline + FastAPI server (port 8700), Qdrant/Neo4j memory, seed runbooks |
 | `aura-cli/` | Terminal UI (Ink/React): live incident feed, state panel, chat, `/approve` |
+| `web/` | Landing page + live web dashboard (Vite/React/Tailwind), black-and-white with light/dark mode |
 | `problem/` | Failure injector + virtual-user traffic simulator for the demo site |
 | `aura-technical-reference.md` | Full design reference (state object, agents, metrics) |
 
@@ -45,6 +46,23 @@ cd ../aura-cli && npm install && npm start
 
 Run the server on its own: `cd agent && uv run python -m aura.main`
 
+## Web dashboard
+
+```bash
+cd web && npm install && npm run dev      # http://localhost:5173 (landing) · /dashboard
+```
+
+The dashboard is another client of the agent server, just like the CLI: it opens the same `/ws`
+WebSocket with the same token (`AURA_API_TOKEN`, default `dev-aura-token`, asked for once on first
+visit). The server broadcasts every event to every client, so an approval or rejection made in the
+terminal shows up in the browser instantly and vice versa. In dev, Vite proxies `/ws` and
+`/incidents` to `127.0.0.1:8700` (override with `AURA_URL`), so no CORS setup is needed.
+
+It shows live health metrics (p95, 5xx rate, RPS, memory, DB sessions), the incident list, each
+incident's hypothesis, confidence and its adjustments, evidence, proposed action with
+Approve / Reject (reason required) / Investigate, anomalies and the audit timeline, plus a chat
+panel and a live event feed.
+
 ## Demo: break something and watch Aura fix it
 
 ```bash
@@ -63,8 +81,8 @@ Actions Aura can propose: `rollback`, `restart_service`, `terminate_db_sessions`
 
 ## Roadmap
 
-- **Web dashboard** — live incident feed, RCA trail with evidence, one-click approve/reject,
-  service dependency graph visualisation, incident history and memory search.
+- **Web dashboard** — ~~live incident feed, RCA trail with evidence, one-click approve/reject~~ (done, `web/`);
+  next: service dependency graph visualisation, incident history and memory search.
 - **Mobile app** — push notifications for new incidents and approve/reject from the phone,
   so on-call engineers can act without opening a laptop.
 - **Integrations** — Slack / Teams / email notifications and approvals.
