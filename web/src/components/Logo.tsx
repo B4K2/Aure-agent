@@ -20,6 +20,9 @@ export default function Logo({ size = 30 }: { size?: number }) {
   const orbit = useMotionValue(START)
   useAnimationFrame((_, delta) => orbit.set(orbit.get() + delta * 0.06)) // one idle lap per 6s
   const angle = useTransform(() => orbit.get() + dir.current * lap.get() * 360)
+  // position the planet on the ring directly (an SVG <g> rotation would spin around its own box)
+  const planetX = useTransform(angle, (a) => 16 + 11 * Math.sin((a * Math.PI) / 180))
+  const planetY = useTransform(angle, (a) => 16 - 11 * Math.cos((a * Math.PI) / 180))
   const drawn = useTransform(lap, (v) => Math.max(v, 0.001))
   // the circle's path starts at 3 o'clock; rotate it so the drawn arc trails the satellite
   const ringRotate = useTransform(() => angle.get() - (dir.current > 0 ? lap.get() * 360 : 0) - 90)
@@ -59,9 +62,7 @@ export default function Logo({ size = 30 }: { size?: number }) {
             transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
           />
         </motion.g>
-        <motion.g style={{ ...center, rotate: angle }}>
-          <circle cx="16" cy="5" r="2.75" fill="currentColor" />
-        </motion.g>
+        <motion.circle cx={planetX} cy={planetY} r="2.75" fill="currentColor" />
       </svg>
       <span className="flex">
         {'Aura'.split('').map((ch, i) => (
