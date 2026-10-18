@@ -74,3 +74,26 @@ export default function Logo({ size = 30, href = '#' }: { size?: number; href?: 
     </motion.a>
   )
 }
+
+// Just the mark, orbiting fast: the "Aura is working" indicator.
+export function LogoSpinner({ size = 14, className = '' }: { size?: number; className?: string }) {
+  const orbit = useMotionValue(START)
+  useAnimationFrame((_, delta) => orbit.set(orbit.get() + delta * 0.45)) // a lap every 0.8s
+  const planetX = useTransform(orbit, (a) => 16 + 11 * Math.sin((a * Math.PI) / 180))
+  const planetY = useTransform(orbit, (a) => 16 - 11 * Math.cos((a * Math.PI) / 180))
+  const ringRotate = useTransform(orbit, (a) => a - 90 - 0.6 * 360)
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" className={`shrink-0 overflow-visible ${className}`} aria-hidden>
+      <motion.circle
+        cx="16" cy="16" r="11" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" opacity={0.7}
+        style={{ ...center, pathLength: 0.6, rotate: ringRotate }}
+      />
+      <motion.circle
+        cx="16" cy="16" r="4" fill="currentColor" style={center}
+        animate={{ scale: [1, 0.6, 1] }}
+        transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.circle cx={planetX} cy={planetY} r="3.25" fill="currentColor" />
+    </svg>
+  )
+}

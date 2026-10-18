@@ -36,9 +36,10 @@ html {
   50% { opacity: 0; }
 }
 
-/* Light mode: invert the whole monochrome page (WebGL canvas included). */
+/* Light mode: invert the whole page (WebGL canvas included); the hue-rotate puts accent
+   colors back on their original hue so red still means red. */
 html.light {
-  filter: invert(1);
+  filter: invert(1) hue-rotate(180deg);
 }
 
 /* Theme switch bubble: let the clip-path animation in ThemeToggle do all the work. */

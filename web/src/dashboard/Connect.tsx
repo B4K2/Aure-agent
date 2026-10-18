@@ -29,7 +29,7 @@ export default function Connect({ onConnect, error }: { onConnect: (token: strin
           placeholder="dev-aura-token"
           className="mt-8 w-full rounded-full border border-white/15 bg-neutral-950 px-5 py-3 font-mono text-sm outline-none placeholder:text-neutral-600 focus:border-white/50"
         />
-        {error && <p className="mt-3 text-sm text-white">✕ {error}</p>}
+        {error && <p className="mt-3 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-sm text-red-300">✕ {error}</p>}
         <button className="mt-4 w-full rounded-full bg-white py-3 text-sm font-medium text-black transition-opacity hover:opacity-85">
           Connect
         </button>
