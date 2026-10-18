@@ -39,11 +39,8 @@ const FEATURES = [
 function Nav() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-white/5 bg-black/60 backdrop-blur-xl">
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <a href="#" className="flex items-center gap-2.5 text-[15px] font-medium tracking-tight">
-          <Logo />
-          Aura
-        </a>
+      <nav className="mx-auto flex h-18 max-w-7xl items-center justify-between px-6">
+        <Logo />
         <div className="hidden items-center gap-8 text-sm text-neutral-400 md:flex">
           <a href="#how" className="transition-colors hover:text-white">How it works</a>
           <a href="#features" className="transition-colors hover:text-white">Features</a>
@@ -71,6 +68,8 @@ function Hero() {
       <motion.div style={{ opacity }} className="absolute inset-0">
         <Threads className="absolute inset-0" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,#000_80%)]" />
+        {/* soft pool behind the copy so the lines never cut through the paragraph */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_45%_30%_at_50%_58%,rgba(0,0,0,0.85),transparent)]" />
       </motion.div>
 
       <motion.div style={{ y }} className="relative z-10 mx-auto max-w-5xl text-center">
@@ -84,7 +83,7 @@ function Hero() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.7 }}
-          className="mx-auto mt-10 max-w-xl text-lg leading-relaxed text-neutral-400"
+          className="mx-auto mt-10 max-w-xl text-lg leading-relaxed text-neutral-300"
         >
           Aura watches your app, ties anomalies to the deploy that caused them, remembers every past
           incident, and proposes a fix. You approve it.

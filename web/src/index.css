@@ -37,9 +37,13 @@ html {
 }
 
 /* Light mode: invert the whole monochrome page (WebGL canvas included). */
-html {
-  transition: filter 0.4s ease;
-}
 html.light {
   filter: invert(1);
+}
+
+/* Theme switch bubble: let the clip-path animation in ThemeToggle do all the work. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
