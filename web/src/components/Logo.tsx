@@ -1,58 +1,58 @@
-// Aura mark + wordmark. The ring draws itself in on load; hovering winds the ring forward,
-// flings the satellite, sends out a ripple and lifts the letters; leaving unwinds it all.
-import { motion, type Variants } from 'motion/react'
-import { useState } from 'react'
+// Aura mark + wordmark. On hover the satellite runs a full lap around the ring, drawing the
+// ring behind it; on leave it runs the lap backwards and the ring redraws the other way.
+import { animate, motion, useMotionValue, useTransform, type Variants } from 'motion/react'
+import { useEffect, useRef } from 'react'
 
 const ease = [0.65, 0, 0.35, 1] as const
 const center = { originX: '50%', originY: '50%' }
+const START = 45 // satellite rest position, degrees clockwise from 12 o'clock
 
-const ring: Variants = {
-  rest: { rotate: 0, scale: 1, transition: { duration: 0.7, ease } },
-  hover: { rotate: 360, scale: 0.92, transition: { duration: 0.7, ease } },
-}
-const core: Variants = {
-  rest: { scale: 1, transition: { type: 'spring', stiffness: 400, damping: 12 } },
-  hover: { scale: 1.45, transition: { type: 'spring', stiffness: 400, damping: 12 } },
-}
-const ripple: Variants = {
-  rest: { opacity: [0.6, 0], scale: [1, 1.35], transition: { duration: 0.6 } },
-  hover: { opacity: [0.6, 0], scale: [1, 1.6], transition: { duration: 0.7 } },
-}
 const letter: Variants = {
   rest: (i: number) => ({ y: 0, transition: { duration: 0.35, delay: (3 - i) * 0.04, ease } }),
   hover: (i: number) => ({ y: [0, -5, 0], transition: { duration: 0.45, delay: i * 0.05, ease } }),
 }
 
 export default function Logo({ size = 30 }: { size?: number }) {
-  // Satellite speeds up while hovered; restarting its loop keeps it continuous.
-  const [hovered, setHovered] = useState(false)
+  // 0 → 1 is one lap. The ring's drawn length follows the satellite.
+  const lap = useMotionValue(1)
+  const angle = useTransform(lap, (v) => START + v * 360)
+  const drawn = useTransform(lap, (v) => (v <= 0 ? 0.001 : v))
+  const ringRotate = useTransform(lap, () => START - 90)
+  const anim = useRef<ReturnType<typeof animate>>(null)
+
+  useEffect(() => {
+    lap.set(0)
+    anim.current = animate(lap, 1, { duration: 1.4, ease })
+  }, [lap])
+
+  const run = (to: number) => {
+    anim.current?.stop()
+    // each hover/leave is a fresh full lap: forwards on enter, backwards on leave
+    lap.set(to === 1 ? 0 : 1)
+    anim.current = animate(lap, to === 1 ? 1 : 0, { duration: 0.9, ease })
+    anim.current.then(() => lap.set(1))
+  }
 
   return (
     <motion.a
       href="#"
       className="flex items-center gap-3 text-xl font-medium tracking-tight"
       initial="rest"
-      animate={hovered ? 'hover' : 'rest'}
-      onHoverStart={() => setHovered(true)}
-      onHoverEnd={() => setHovered(false)}
+      whileHover="hover"
+      onHoverStart={() => run(1)}
+      onHoverEnd={() => run(-1)}
     >
       <svg width={size} height={size} viewBox="0 0 32 32" fill="none" className="overflow-visible">
-        <motion.circle cx="16" cy="16" r="12" stroke="currentColor" strokeWidth="1" variants={ripple} style={center} opacity={0} />
-        <motion.g variants={ring} style={center}>
-          <motion.circle
-            cx="16" cy="16" r="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 1.4, ease }}
-          />
-        </motion.g>
-        <motion.circle cx="16" cy="16" r="3.5" fill="currentColor" variants={core} style={center} />
-        <motion.g
-          key={hovered ? 'fast' : 'slow'}
-          animate={{ rotate: 360 }}
-          transition={{ duration: hovered ? 1.2 : 6, repeat: Infinity, ease: 'linear' }}
-          style={center}
-        >
+        <motion.circle
+          cx="16" cy="16" r="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+          style={{ ...center, pathLength: drawn, rotate: ringRotate }}
+        />
+        <motion.circle
+          cx="16" cy="16" r="3.5" fill="currentColor" style={center}
+          variants={{ rest: { scale: 1 }, hover: { scale: 1.35 } }}
+          transition={{ type: 'spring', stiffness: 400, damping: 12 }}
+        />
+        <motion.g style={{ ...center, rotate: angle }}>
           <circle cx="16" cy="2.5" r="2" fill="currentColor" />
         </motion.g>
       </svg>

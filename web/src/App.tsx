@@ -1,4 +1,4 @@
-import { motion, useScroll, useTransform } from 'motion/react'
+import { motion, useScroll, useSpring, useTransform, type MotionValue } from 'motion/react'
 import { useRef } from 'react'
 import CountUp from './components/CountUp'
 import Logo from './components/Logo'
@@ -162,7 +162,7 @@ function Features() {
       <SectionHead eyebrow="Features" title="Built for the 3am" serif="page." />
       <div className="grid gap-4 md:grid-cols-2">
         {FEATURES.map((f, i) => (
-          <Reveal key={f.title} delay={i * 0.08}>
+          <Reveal key={f.title} delay={i * 0.08} parallax={i % 2 ? 60 : 0}>
             <SpotlightCard className="h-full">
               <div className="font-mono text-xs text-neutral-600">0{i + 1}</div>
               <h3 className="mt-16 text-2xl font-medium tracking-tight">{f.title}</h3>
@@ -172,6 +172,20 @@ function Features() {
         ))}
       </div>
     </section>
+  )
+}
+
+// Tilts back and scales up into place as it scrolls in, like a screen being lifted upright.
+function ScrollTilt({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'center center'] })
+  const rotateX = useTransform(scrollYProgress, [0, 1], [28, 0])
+  const scale = useTransform(scrollYProgress, [0, 1], [0.86, 1])
+  const opacity = useTransform(scrollYProgress, [0, 0.5], [0, 1])
+  return (
+    <div ref={ref} style={{ perspective: 1200 }}>
+      <motion.div style={{ rotateX, scale, opacity }}>{children}</motion.div>
+    </div>
   )
 }
 
@@ -192,9 +206,9 @@ function Demo() {
           </p>
         </Reveal>
       </div>
-      <Reveal delay={0.15}>
+      <ScrollTilt>
         <Terminal />
-      </Reveal>
+      </ScrollTilt>
     </section>
   )
 }
@@ -221,15 +235,31 @@ function Stats() {
   )
 }
 
+function ScrollWord({ word, i, total, progress }: { word: string; i: number; total: number; progress: MotionValue<number> }) {
+  const opacity = useTransform(progress, [i / total, (i + 1) / total], [0.15, 1])
+  return <motion.span style={{ opacity }}>{word} </motion.span>
+}
+
+// Words light up one by one as the paragraph scrolls through the viewport.
 function Statement() {
+  const ref = useRef<HTMLParagraphElement>(null)
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start 0.85', 'end 0.45'] })
+  const words = "It doesn't replace your on-call engineer. It makes sure they never start from zero.".split(' ')
   return (
     <section className="mx-auto max-w-5xl px-6 py-48 text-center">
-      <p className="text-[clamp(1.75rem,4vw,3.25rem)] leading-[1.15] font-light tracking-[-0.03em] text-neutral-500">
-        <SplitText text="It doesn't replace your on-call engineer." stagger={0.04} />{' '}
-        <SplitText text="It makes sure they never start from zero." delay={0.3} stagger={0.04} className="text-white" />
+      <p ref={ref} className="text-[clamp(1.75rem,4vw,3.25rem)] leading-[1.15] font-light tracking-[-0.03em]">
+        {words.map((w, i) => (
+          <ScrollWord key={i} word={w} i={i} total={words.length} progress={scrollYProgress} />
+        ))}
       </p>
     </section>
   )
+}
+
+function ScrollProgress() {
+  const { scrollYProgress } = useScroll()
+  const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 30 })
+  return <motion.div style={{ scaleX }} className="fixed inset-x-0 top-0 z-[70] h-px origin-left bg-white" />
 }
 
 function CTA() {
@@ -273,6 +303,7 @@ function Footer() {
 export default function App() {
   return (
     <div className="grain min-h-screen bg-black font-sans text-white">
+      <ScrollProgress />
       <Nav />
       <main>
         <Hero />

@@ -1,5 +1,6 @@
 // The agent graph as a horizontal track with a pulse travelling through each stage.
-import { motion } from 'motion/react'
+import { motion, useScroll, useTransform } from 'motion/react'
+import { useRef } from 'react'
 
 const STAGES = [
   { n: '01', name: 'Detect', body: 'Watches latency, error rate, saturation and DB health. Flags anomalies, not noise.' },
@@ -11,9 +12,15 @@ const STAGES = [
 ]
 
 export default function Pipeline() {
+  const ref = useRef<HTMLDivElement>(null)
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start 0.9', 'start 0.35'] })
+  const fill = useTransform(scrollYProgress, [0, 1], [0, 1])
+
   return (
-    <div className="relative">
+    <div ref={ref} className="relative">
       <div className="absolute top-[7px] right-0 left-0 hidden h-px bg-white/10 lg:block" />
+      {/* track fills in as you scroll the section into view */}
+      <motion.div style={{ scaleX: fill }} className="absolute top-[7px] right-0 left-0 hidden h-px origin-left bg-white/60 lg:block" />
       <motion.div
         className="absolute top-[3px] hidden size-[9px] rounded-full bg-white shadow-[0_0_24px_4px_rgba(255,255,255,0.6)] lg:block"
         animate={{ left: ['0%', '100%'] }}
