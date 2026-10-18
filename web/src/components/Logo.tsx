@@ -49,18 +49,18 @@ export default function Logo({ size = 30 }: { size?: number }) {
     >
       <svg width={size} height={size} viewBox="0 0 32 32" fill="none" className="overflow-visible">
         <motion.circle
-          cx="16" cy="16" r="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+          cx="16" cy="16" r="9.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
           style={{ ...center, pathLength: drawn, rotate: ringRotate }}
         />
         <motion.g variants={{ rest: { scale: 1 }, hover: { scale: 1.35 } }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} style={center}>
           <motion.circle
-            cx="16" cy="16" r="3.5" fill="currentColor" style={center}
+            cx="16" cy="16" r="3" fill="currentColor" style={center}
             animate={{ scale: [1, 0.7, 1] }}
             transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
           />
         </motion.g>
         <motion.g style={{ ...center, rotate: angle }}>
-          <circle cx="16" cy="2.5" r="2" fill="currentColor" />
+          <circle cx="16" cy="1.5" r="2" fill="currentColor" />
         </motion.g>
       </svg>
       <span className="flex">
