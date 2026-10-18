@@ -48,8 +48,8 @@ function Nav() {
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <a href={REPO} className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-black transition-opacity hover:opacity-85">
-            Get started
+          <a href="/dashboard" className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-black transition-opacity hover:opacity-85">
+            Dashboard
           </a>
         </div>
       </nav>

@@ -12,7 +12,7 @@ const letter: Variants = {
   hover: (i: number) => ({ y: [0, -5, 0], transition: { duration: 0.45, delay: i * 0.05, ease } }),
 }
 
-export default function Logo({ size = 30 }: { size?: number }) {
+export default function Logo({ size = 30, href = '#' }: { size?: number; href?: string }) {
   // 0 → 1 is one lap. The ring's drawn length follows the satellite.
   // dir 1 = clockwise lap (enter / load), -1 = counter-clockwise lap (leave).
   const lap = useMotionValue(1)
@@ -43,7 +43,7 @@ export default function Logo({ size = 30 }: { size?: number }) {
 
   return (
     <motion.a
-      href="#"
+      href={href}
       className="flex items-center gap-3 text-xl font-medium tracking-tight"
       initial="rest"
       whileHover="hover"
