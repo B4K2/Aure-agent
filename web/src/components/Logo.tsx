@@ -14,10 +14,13 @@ const letter: Variants = {
 
 export default function Logo({ size = 30 }: { size?: number }) {
   // 0 → 1 is one lap. The ring's drawn length follows the satellite.
+  // dir 1 = clockwise lap (enter / load), -1 = counter-clockwise lap (leave).
   const lap = useMotionValue(1)
-  const angle = useTransform(lap, (v) => START + v * 360)
-  const drawn = useTransform(lap, (v) => (v <= 0 ? 0.001 : v))
-  const ringRotate = useTransform(lap, () => START - 90)
+  const dir = useRef(1)
+  const angle = useTransform(lap, (v) => START + dir.current * v * 360)
+  const drawn = useTransform(lap, (v) => Math.max(v, 0.001))
+  // the circle's path starts at 3 o'clock; rotate it so the drawn arc trails the satellite
+  const ringRotate = useTransform(lap, (v) => (dir.current > 0 ? START : START - v * 360) - 90)
   const anim = useRef<ReturnType<typeof animate>>(null)
 
   useEffect(() => {
@@ -25,12 +28,12 @@ export default function Logo({ size = 30 }: { size?: number }) {
     anim.current = animate(lap, 1, { duration: 1.4, ease })
   }, [lap])
 
-  const run = (to: number) => {
+  // each hover/leave is a fresh full lap: clockwise on enter, counter-clockwise on leave
+  const run = (d: number) => {
     anim.current?.stop()
-    // each hover/leave is a fresh full lap: forwards on enter, backwards on leave
-    lap.set(to === 1 ? 0 : 1)
-    anim.current = animate(lap, to === 1 ? 1 : 0, { duration: 0.9, ease })
-    anim.current.then(() => lap.set(1))
+    dir.current = d
+    lap.set(0)
+    anim.current = animate(lap, 1, { duration: 0.9, ease })
   }
 
   return (
