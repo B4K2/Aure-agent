@@ -1,6 +1,6 @@
-// Aura mark + wordmark. On hover the satellite runs a full lap around the ring, drawing the
-// ring behind it; on leave it runs the lap backwards and the ring redraws the other way.
-import { animate, motion, useMotionValue, useTransform, type Variants } from 'motion/react'
+// Aura mark + wordmark. The satellite orbits the ring continuously while the core breathes.
+// On hover it adds a fast lap, drawing the ring behind it; on leave it laps back the other way.
+import { animate, motion, useAnimationFrame, useMotionValue, useTransform, type Variants } from 'motion/react'
 import { useEffect, useRef } from 'react'
 
 const ease = [0.65, 0, 0.35, 1] as const
@@ -17,10 +17,12 @@ export default function Logo({ size = 30 }: { size?: number }) {
   // dir 1 = clockwise lap (enter / load), -1 = counter-clockwise lap (leave).
   const lap = useMotionValue(1)
   const dir = useRef(1)
-  const angle = useTransform(lap, (v) => START + dir.current * v * 360)
+  const orbit = useMotionValue(START)
+  useAnimationFrame((_, delta) => orbit.set(orbit.get() + delta * 0.06)) // one idle lap per 6s
+  const angle = useTransform(() => orbit.get() + dir.current * lap.get() * 360)
   const drawn = useTransform(lap, (v) => Math.max(v, 0.001))
   // the circle's path starts at 3 o'clock; rotate it so the drawn arc trails the satellite
-  const ringRotate = useTransform(lap, (v) => (dir.current > 0 ? START : START - v * 360) - 90)
+  const ringRotate = useTransform(() => angle.get() - (dir.current > 0 ? lap.get() * 360 : 0) - 90)
   const anim = useRef<ReturnType<typeof animate>>(null)
 
   useEffect(() => {
@@ -50,11 +52,13 @@ export default function Logo({ size = 30 }: { size?: number }) {
           cx="16" cy="16" r="11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
           style={{ ...center, pathLength: drawn, rotate: ringRotate }}
         />
-        <motion.circle
-          cx="16" cy="16" r="3.5" fill="currentColor" style={center}
-          variants={{ rest: { scale: 1 }, hover: { scale: 1.35 } }}
-          transition={{ type: 'spring', stiffness: 400, damping: 12 }}
-        />
+        <motion.g variants={{ rest: { scale: 1 }, hover: { scale: 1.35 } }} transition={{ type: 'spring', stiffness: 400, damping: 12 }} style={center}>
+          <motion.circle
+            cx="16" cy="16" r="3.5" fill="currentColor" style={center}
+            animate={{ scale: [1, 0.7, 1] }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </motion.g>
         <motion.g style={{ ...center, rotate: angle }}>
           <circle cx="16" cy="2.5" r="2" fill="currentColor" />
         </motion.g>
