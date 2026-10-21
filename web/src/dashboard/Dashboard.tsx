@@ -9,7 +9,7 @@ import Panel from './Panel'
 import MetricTile from './Sparkline'
 import Splitter, { usePersisted } from './Splitter'
 import Topology from './Topology'
-import { ADVISORY, CLOSED, type Beat, type Incident } from './types'
+import { ADVISORY, CLOSED, GENERAL, type Beat, type Incident } from './types'
 import { useAura, type Status } from './useAura'
 
 const INVESTIGATE = 'Investigate this incident with your tools (current signals, read-only DB queries such as ' +
@@ -286,15 +286,16 @@ function IncidentDetail({ inc, stage, aura }: { inc: Incident; stage?: string; a
   const advisory = action ? ADVISORY.has(action.type) : false
   const [rejecting, setRejecting] = useState(false)
   const [reason, setReason] = useState('')
-  // set on Investigate click; cleared once Aura finishes its turn (thinking goes back to null)
+  // set on Investigate click; cleared once Aura finishes its turn in this incident's thread
   const [investigating, setInvestigating] = useState(false)
   const wasThinking = useRef(false)
 
   useEffect(() => { setRejecting(false); setReason(''); setInvestigating(false) }, [inc.incident_id])
+  const busy = aura.thinking[inc.incident_id]
   useEffect(() => {
-    if (aura.thinking) wasThinking.current = true
+    if (busy) wasThinking.current = true
     else if (wasThinking.current) { wasThinking.current = false; setInvestigating(false) }
-  }, [aura.thinking])
+  }, [busy])
 
   return (
     <Panel
@@ -444,15 +445,46 @@ function IncidentDetail({ inc, stage, aura }: { inc: Incident; stage?: string; a
 
 function Chat({ aura, incidentId, grow }: { aura: ReturnType<typeof useAura>; incidentId?: string; grow: number }) {
   const [text, setText] = useState('')
+  // Incident tab = a thread per incident (switches with the selection); General = one thread for everything else.
+  const [general, setGeneral] = useState(false)
+  const thread = general || !incidentId ? GENERAL : incidentId
+  const msgs = aura.chat[thread] ?? []
+  const thinking = aura.thinking[thread]
   const box = useRef<HTMLDivElement>(null)
   // keep the newest message in view without scrolling the page itself
-  useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight }, [aura.chat.length, aura.thinking])
+  useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight }, [thread, msgs.length, thinking])
+
+  const tab = (label: React.ReactNode, active: boolean, onClick: () => void, dot: boolean, disabled = false) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`relative flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] transition-colors disabled:opacity-40 ${active ? 'text-black' : 'text-neutral-500 hover:text-white'}`}
+    >
+      {active && <motion.span layoutId="chat-tab" className="absolute inset-0 rounded-full bg-white" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
+      <span className="relative">{label}</span>
+      {dot && <span className="relative size-1.5 animate-pulse rounded-full bg-sky-400" aria-label="Aura is working" />}
+    </button>
+  )
 
   return (
-    <Panel className="xl:min-h-0 xl:basis-0" style={{ flexGrow: grow }} title="Ask Aura" right={incidentId && <span className="font-mono text-[11px] text-neutral-600">{incidentId}</span>}>
+    <Panel
+      className="xl:min-h-0 xl:basis-0"
+      style={{ flexGrow: grow }}
+      title="Ask Aura"
+      right={
+        <div className="flex gap-0.5 rounded-full border border-white/10 p-0.5">
+          {tab(<span className="font-mono">{incidentId ?? 'Incident'}</span>, thread !== GENERAL, () => setGeneral(false), !!incidentId && !!aura.thinking[incidentId] && thread === GENERAL, !incidentId)}
+          {tab('General', thread === GENERAL, () => setGeneral(true), !!aura.thinking[GENERAL] && thread !== GENERAL)}
+        </div>
+      }
+    >
       <div ref={box} className="h-72 min-h-0 space-y-3 overflow-y-auto p-4 text-sm xl:h-auto xl:flex-1">
-        {aura.chat.length === 0 && <p className="text-neutral-500">Ask why, what changed, or what happened last time.</p>}
-        {aura.chat.map((m) =>
+        {msgs.length === 0 && (
+          <p className="text-neutral-500">
+            {thread === GENERAL ? 'Ask anything: site health, recent deploys, the database, runbooks.' : `Ask why ${thread} happened, what changed, or what happened last time.`}
+          </p>
+        )}
+        {msgs.map((m) =>
           m.role === 'tool' ? (
             <div key={m.id} className="truncate font-mono text-[11px] text-neutral-600">⏺ {m.text}</div>
           ) : (
@@ -463,10 +495,10 @@ function Chat({ aura, incidentId, grow }: { aura: ReturnType<typeof useAura>; in
             )
           ),
         )}
-        {aura.thinking && (
+        {thinking && (
           <div className="flex items-center gap-2 text-xs text-neutral-500">
             <LogoSpinner size={16} className="text-sky-300" />
-            {aura.thinking === 'thinking' ? 'Aura is thinking' : aura.thinking}
+            {thinking === 'thinking' ? 'Aura is thinking' : thinking}
           </div>
         )}
       </div>
@@ -475,14 +507,14 @@ function Chat({ aura, incidentId, grow }: { aura: ReturnType<typeof useAura>; in
         onSubmit={(e) => {
           e.preventDefault()
           if (!text.trim()) return
-          aura.ask(text.trim(), incidentId)
+          aura.ask(text.trim(), thread === GENERAL ? undefined : thread)
           setText('')
         }}
       >
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Message Aura…"
+          placeholder={thread === GENERAL ? 'Message Aura…' : `Message Aura about ${thread}…`}
           className="w-full rounded-full border border-white/15 bg-black px-4 py-2 text-sm outline-none placeholder:text-neutral-600 focus:border-white/50"
         />
       </form>

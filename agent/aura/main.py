@@ -350,12 +350,13 @@ async def ws(sock: WebSocket):
         while True:
             msg = await sock.receive_json()
             if msg.get("type") == "chat":
-                await sock.send_json({"type": "thinking", "at": now()})
+                iid = msg.get("incident_id") or None  # None = the general thread
+                await sock.send_json({"type": "thinking", "incident_id": iid, "at": now()})
                 try:
-                    answer = await loop.run_in_executor(aura.pool, convo.send, msg["text"], msg.get("incident_id"))
+                    answer = await loop.run_in_executor(aura.pool, convo.send, msg["text"], iid)
                 except Exception as e:
                     answer = f"(LLM error: {e})"
-                await sock.send_json({"type": "answer", "text": answer, "at": now()})
+                await sock.send_json({"type": "answer", "text": answer, "incident_id": iid, "at": now()})
             elif msg.get("type") == "decide":
                 try:
                     aura.decide(msg["incident_id"], msg["decision"], msg.get("note") or "")

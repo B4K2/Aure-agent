@@ -66,3 +66,6 @@ export type AuraEvent = { type: string; at?: string; [k: string]: any } // eslin
 
 export const ADVISORY = new Set(['investigate_further', 'scale'])
 export const CLOSED = new Set(['resolved', 'rejected', 'unresolved'])
+
+/** Chat thread key for questions not tied to an incident. */
+export const GENERAL = ''

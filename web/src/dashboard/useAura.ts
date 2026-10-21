@@ -1,7 +1,7 @@
 // One WebSocket to the agent server, the same protocol aura-cli uses (aura-cli/src/backend.ts).
 // Every client gets every broadcast, so approvals from the CLI show up here and vice versa.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AuraEvent, Beat, ChatMsg, FeedItem, Incident } from './types'
+import { GENERAL, type AuraEvent, type Beat, type ChatMsg, type FeedItem, type Incident } from './types'
 
 export type Status = 'connecting' | 'connected' | 'reconnecting' | 'bad token'
 
@@ -13,8 +13,9 @@ export function useAura(token: string | null) {
   const [incidents, setIncidents] = useState<Record<string, Incident>>({})
   const [stages, setStages] = useState<Record<string, string>>({}) // incident → live stage
   const [feed, setFeed] = useState<FeedItem[]>([])
-  const [chat, setChat] = useState<ChatMsg[]>([])
-  const [thinking, setThinking] = useState<string | null>(null)
+  // chat threads: one per incident id, '' = the general thread (GENERAL)
+  const [chat, setChat] = useState<Record<string, ChatMsg[]>>({})
+  const [thinking, setThinking] = useState<Record<string, string>>({}) // thread → 'thinking' | tool name
   const [opened, setOpened] = useState<string | null>(null) // newest incident, for auto-focus
   const ws = useRef<WebSocket | null>(null)
   const seq = useRef(0)
@@ -23,7 +24,10 @@ export function useAura(token: string | null) {
     setFeed((f) => [{ id: seq.current++, at, kind, text, incidentId }, ...f].slice(0, 200))
   const upsert = (inc: Incident) => setIncidents((m) => ({ ...m, [inc.incident_id]: { ...m[inc.incident_id], ...inc } }))
   const settle = (iid: string) => setStages(({ [iid]: _, ...rest }) => rest)
-  const say = (role: ChatMsg['role'], text: string) => setChat((c) => [...c, { id: seq.current++, role, text }])
+  const say = (thread: string, role: ChatMsg['role'], text: string) =>
+    setChat((c) => ({ ...c, [thread]: [...(c[thread] || []), { id: seq.current++, role, text }] }))
+  const think = (thread: string, what: string | null) =>
+    setThinking(({ [thread]: _, ...rest }) => (what ? { ...rest, [thread]: what } : rest))
 
   const onEvent = useCallback((e: AuraEvent) => {
     switch (e.type) {
@@ -74,21 +78,20 @@ export function useAura(token: string | null) {
         break
       }
       case 'thinking':
-        setThinking('thinking')
+        think(e.incident_id ?? GENERAL, 'thinking')
         break
       case 'tool':
-        setThinking(e.name)
-        say('tool', `${e.name}(${JSON.stringify(e.args).slice(1, -1).slice(0, 100)})`)
+        think(e.incident_id ?? GENERAL, e.name)
+        say(e.incident_id ?? GENERAL, 'tool', `${e.name}(${JSON.stringify(e.args).slice(1, -1).slice(0, 100)})`)
         break
       case 'answer':
-        setThinking(null)
-        say('aura', e.text)
+        think(e.incident_id ?? GENERAL, null)
+        say(e.incident_id ?? GENERAL, 'aura', e.text)
         break
       case 'system':
         log('system', e.text, e.at)
         break
       case 'error':
-        setThinking(null)
         log('error', e.message, e.at, e.incident_id)
         break
     }
@@ -108,6 +111,7 @@ export function useAura(token: string | null) {
       }
       sock.onclose = (ev) => {
         if (closed) return
+        setThinking({}) // any answer in flight died with the socket
         if (ev.code === 4401) return setStatus('bad token')
         setStatus('reconnecting')
         retry = setTimeout(connect, 1500)
@@ -129,7 +133,7 @@ export function useAura(token: string | null) {
 
   return {
     status, watching, service, beats, incidents, stages, feed, chat, thinking, opened,
-    ask: (text: string, incidentId?: string) => { say('user', text); send({ type: 'chat', text, incident_id: incidentId }) },
+    ask: (text: string, incidentId?: string) => { say(incidentId ?? GENERAL, 'user', text); send({ type: 'chat', text, incident_id: incidentId }) },
     decide: (incidentId: string, decision: 'approved' | 'rejected', note = '') => send({ type: 'decide', incident_id: incidentId, decision, note }),
     load: (incidentId: string) => send({ type: 'get', incident_id: incidentId }),
   }
