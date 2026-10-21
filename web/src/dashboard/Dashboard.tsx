@@ -4,8 +4,11 @@ import Logo, { LogoSpinner } from '../components/Logo'
 import ThemeToggle from '../components/ThemeToggle'
 import Connect from './Connect'
 import Markdown from './Markdown'
+import MemoryView from './MemoryView'
+import Panel from './Panel'
 import MetricTile from './Sparkline'
 import Splitter, { usePersisted } from './Splitter'
+import Topology from './Topology'
 import { ADVISORY, CLOSED, type Beat, type Incident } from './types'
 import { useAura, type Status } from './useAura'
 
@@ -44,10 +47,22 @@ export default function Dashboard() {
       />
     )
   }
-  return <Console aura={aura} onSignOut={() => { localStorage.removeItem('aura-token'); setToken(null) }} />
+  return <Console aura={aura} token={token} onSignOut={() => { localStorage.removeItem('aura-token'); setToken(null) }} />
 }
 
-function Console({ aura, onSignOut }: { aura: ReturnType<typeof useAura>; onSignOut: () => void }) {
+const VIEWS = { live: 'Live', topology: 'Topology', memory: 'Memory' } as const
+type View = keyof typeof VIEWS
+const viewFromHash = (): View => (location.hash.slice(1) in VIEWS ? (location.hash.slice(1) as View) : 'live')
+
+function Console({ aura, token, onSignOut }: { aura: ReturnType<typeof useAura>; token: string; onSignOut: () => void }) {
+  const [view, setViewState] = useState<View>(viewFromHash)
+  useEffect(() => {
+    const sync = () => setViewState(viewFromHash())
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [])
+  const setView = (v: View) => { history.replaceState(null, '', v === 'live' ? location.pathname : `#${v}`); setViewState(v) }
+
   const list = useMemo(
     () => Object.values(aura.incidents).sort((a, b) => (b.opened_at || '').localeCompare(a.opened_at || '')),
     [aura.incidents],
@@ -65,6 +80,9 @@ function Console({ aura, onSignOut }: { aura: ReturnType<typeof useAura>; onSign
   const last = beats.at(-1)
   const times = beats.map((b) => b.at)
   const open = list.filter((i) => !CLOSED.has(i.status)).length
+  // learning writes to memory when an incident closes, so that's when memory views refetch
+  const closed = list.filter((i) => CLOSED.has(i.status)).length
+  const openInLive = (id: string) => { setSelected(id); setView('live') }
 
   // resizable columns + chat/feed split (xl only)
   const [left, setLeft] = usePersisted('aura-col-left', 300)
@@ -80,7 +98,14 @@ function Console({ aura, onSignOut }: { aura: ReturnType<typeof useAura>; onSign
         <div className="flex h-16 items-center justify-between px-6">
           <div className="flex items-center gap-6">
             <Logo href="/" />
-            <span className="hidden text-sm text-neutral-500 md:inline">Dashboard</span>
+            <nav className="flex gap-1 rounded-full border border-white/10 p-1 text-sm">
+              {(Object.keys(VIEWS) as View[]).map((v) => (
+                <button key={v} onClick={() => setView(v)} className={`relative rounded-full px-3 py-1 transition-colors duration-300 ${view === v ? 'text-black' : 'text-neutral-400 hover:text-white'}`}>
+                  {view === v && <motion.span layoutId="view-pill" className="absolute inset-0 rounded-full bg-white" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
+                  <span className="relative">{VIEWS[v]}</span>
+                </button>
+              ))}
+            </nav>
           </div>
           <div className="flex items-center gap-4 text-xs">
             <ConnectionPill status={aura.status} />
@@ -108,7 +133,22 @@ function Console({ aura, onSignOut }: { aura: ReturnType<typeof useAura>; onSign
           />
         </section>
 
-        <section
+        <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={view}
+          className="flex min-h-0 flex-1 flex-col"
+          initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, y: -8, filter: 'blur(4px)' }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        >
+        {view === 'topology' && (
+          <Topology token={token} service={aura.service} beat={last} open={list.find((i) => !CLOSED.has(i.status))} version={closed} onOpenIncident={openInLive} />
+        )}
+        {view === 'memory' && (
+          <MemoryView token={token} version={closed} live={new Set(list.map((i) => i.incident_id))} onOpenIncident={openInLive} />
+        )}
+        {view === 'live' && <section
           className="grid min-h-0 flex-1 gap-6 xl:grid-cols-[var(--l)_auto_minmax(0,1fr)_auto_var(--r)] xl:gap-0"
           style={{ '--l': `${left}px`, '--r': `${right}px` } as React.CSSProperties}
         >
@@ -140,7 +180,9 @@ function Console({ aura, onSignOut }: { aura: ReturnType<typeof useAura>; onSign
             />
             <Feed aura={aura} onSelect={setSelected} grow={1 - split} />
           </div>
-        </section>
+        </section>}
+        </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   )
@@ -166,18 +208,6 @@ function HealthTile({ health, open }: { health?: Beat['health']; open: number })
         <div className={`text-2xl font-light tracking-tight ${open || down ? 'text-red-300' : health ? 'text-emerald-300' : ''}`}>{open ? `${open} open` : health ? (health.up ? 'Healthy' : 'Down') : '—'}</div>
         <div className="mt-1 text-xs text-neutral-400">{open ? 'incident in progress' : health && !health.up ? `health check: ${health.status}` : 'no open incidents'}</div>
       </div>
-    </div>
-  )
-}
-
-function Panel({ title, children, className = '', right, style }: { title: string; children: React.ReactNode; className?: string; right?: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <div style={style} className={`flex min-h-0 min-w-0 flex-col rounded-2xl border border-white/10 bg-neutral-950 ${className}`}>
-      <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
-        <h2 className="text-xs font-medium tracking-widest text-neutral-500 uppercase">{title}</h2>
-        {right}
-      </div>
-      {children}
     </div>
   )
 }

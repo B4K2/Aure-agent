@@ -55,13 +55,22 @@ cd web && npm install && npm run dev      # http://localhost:5173 (landing) · /
 The dashboard is another client of the agent server, just like the CLI: it opens the same `/ws`
 WebSocket with the same token (`AURA_API_TOKEN`, default `dev-aura-token`, asked for once on first
 visit). The server broadcasts every event to every client, so an approval or rejection made in the
-terminal shows up in the browser instantly and vice versa. In dev, Vite proxies `/ws` and
-`/incidents` to `127.0.0.1:8700` (override with `AURA_URL`), so no CORS setup is needed.
+terminal shows up in the browser instantly and vice versa. In dev, Vite proxies `/ws`,
+`/incidents` and `/memory` to `127.0.0.1:8700` (override with `AURA_URL`), so no CORS setup is needed.
 
 It shows live health metrics (p95, 5xx rate, RPS, memory, DB sessions), the incident list, each
 incident's hypothesis, confidence and its adjustments, evidence, proposed action with
 Approve / Reject (reason required) / Investigate, anomalies and the audit timeline, plus a chat
 panel and a live event feed.
+
+Two more tabs read Aura's long-term memory over REST (`/memory/*`, same token):
+
+- **Topology**: the Neo4j service dependency graph, colored by live health, with the blast radius
+  (everything upstream of a failing service) marked as impacted. Click a service for its root-cause
+  history, past incidents and deployments (including which deploy caused which incident).
+- **Memory**: every incident Aura has learned from (confirmed, rejected and inconclusive), filterable
+  by outcome and root cause, plus semantic search across past incidents and runbooks using the same
+  embeddings Aura retrieves with.
 
 ## Demo: break something and watch Aura fix it
 
@@ -81,8 +90,8 @@ Actions Aura can propose: `rollback`, `restart_service`, `terminate_db_sessions`
 
 ## Roadmap
 
-- **Web dashboard** — ~~live incident feed, RCA trail with evidence, one-click approve/reject~~ (done, `web/`);
-  next: service dependency graph visualisation, incident history and memory search.
+- **Web dashboard** — ~~live incident feed, RCA trail with evidence, one-click approve/reject, service
+  dependency graph, incident history and memory search~~ (done, `web/`).
 - **Mobile app** — push notifications for new incidents and approve/reject from the phone,
   so on-call engineers can act without opening a laptop.
 - **Integrations** — Slack / Teams / email notifications and approvals.

@@ -292,6 +292,44 @@ def decide(iid: str, decision: str, request: Request, note: str = ""):
     return {"ok": True}
 
 
+def _memory(fn, *args):
+    try:
+        return fn(*args)
+    except Exception as e:  # Qdrant / Neo4j down: say so instead of a bare 500
+        log.warning("memory query failed: %s", e)
+        raise HTTPException(503, f"memory unavailable: {e}")
+
+
+@api.get("/memory/topology")
+def topology(request: Request):
+    _auth(request.headers.get("x-aura-token"))
+    from .memory import graph_db
+    return _memory(graph_db.topology)
+
+
+@api.get("/memory/services/{name}")
+def service(name: str, request: Request):
+    _auth(request.headers.get("x-aura-token"))
+    from .memory import graph_db
+    return _memory(graph_db.service_detail, name)
+
+
+@api.get("/memory/incidents")
+def history(request: Request):
+    _auth(request.headers.get("x-aura-token"))
+    from .memory import vector_db
+    return _memory(vector_db.all_incidents)
+
+
+@api.get("/memory/search")
+def search(q: str, request: Request):
+    _auth(request.headers.get("x-aura-token"))
+    from .memory import vector_db
+    if not q.strip():
+        raise HTTPException(400, "empty query")
+    return _memory(vector_db.search_memory, q.strip())
+
+
 @api.websocket("/ws")
 async def ws(sock: WebSocket):
     if sock.query_params.get("token") != config.API_TOKEN:
@@ -300,7 +338,7 @@ async def ws(sock: WebSocket):
     await sock.accept()
     aura.clients.add(sock)
     convo = Conversation(aura, lambda e: aura.emit(e))
-    await sock.send_json({"type": "hello", "watching": config.VOID_URL, "incidents": aura.list_incidents(),
+    await sock.send_json({"type": "hello", "watching": config.VOID_URL, "service": config.SERVICE, "incidents": aura.list_incidents(),
                          "history": list(aura.beats), "at": now()})
     loop = asyncio.get_running_loop()
     try:

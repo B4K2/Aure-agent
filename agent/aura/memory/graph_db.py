@@ -79,3 +79,34 @@ def record_incident(incident_id: str, service: str, root_cause_type: str, confir
     if commit_hash:
         _run("""MATCH (d:Deployment {commit_hash: $hash}), (i:Incident {id: $id}) MERGE (d)-[:CAUSED]->(i)""",
              hash=commit_hash, id=incident_id)
+
+
+def topology() -> dict:
+    """Every service, its DEPENDS_ON edges, and what memory knows about it (dashboard graph)."""
+    nodes = _run("""
+        MATCH (s:Service)
+        OPTIONAL MATCH (s)<-[:AFFECTED]-(i:Incident)
+        OPTIONAL MATCH (s)<-[:DEPLOYED_TO]-(d:Deployment)
+        RETURN s.name AS name, s.tier AS tier, count(DISTINCT i) AS incidents,
+               count(DISTINCT CASE WHEN i.confirmed THEN i END) AS confirmed, count(DISTINCT d) AS deployments""")
+    edges = _run("MATCH (a:Service)-[:DEPENDS_ON]->(b:Service) RETURN a.name AS source, b.name AS target")
+    return {"nodes": nodes, "edges": edges}
+
+
+def service_detail(service: str) -> dict:
+    incidents = _run("""
+        MATCH (s:Service {name: $service})<-[:AFFECTED]-(i:Incident)
+        OPTIONAL MATCH (i)-[:RESOLVED_BY]->(a:Action)
+        OPTIONAL MATCH (d:Deployment)-[:CAUSED]->(i)
+        RETURN i.id AS id, i.root_cause_type AS root_cause_type, i.confirmed AS confirmed, i.timestamp AS timestamp,
+               a.type AS action, d.commit_hash AS commit
+        ORDER BY i.timestamp DESC LIMIT 20""", service=service)
+    deployments = _run("""
+        MATCH (s:Service {name: $service})<-[:DEPLOYED_TO]-(d:Deployment)
+        OPTIONAL MATCH (c:Commit)-[:PART_OF]->(d)
+        OPTIONAL MATCH (d)-[:CAUSED]->(i:Incident)
+        RETURN d.commit_hash AS commit, d.timestamp AS timestamp, d.author AS author, c.message AS message,
+               collect(i.id) AS caused
+        ORDER BY d.timestamp DESC LIMIT 10""", service=service)
+    return {"name": service, "incidents": incidents, "deployments": deployments,
+            "frequency": root_cause_frequency(service), "impact": impact(service)}

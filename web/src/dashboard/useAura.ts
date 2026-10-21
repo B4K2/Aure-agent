@@ -8,6 +8,7 @@ export type Status = 'connecting' | 'connected' | 'reconnecting' | 'bad token'
 export function useAura(token: string | null) {
   const [status, setStatus] = useState<Status>('connecting')
   const [watching, setWatching] = useState('')
+  const [service, setService] = useState('void-app') // the watched service, as named in the topology
   const [beats, setBeats] = useState<Beat[]>([])
   const [incidents, setIncidents] = useState<Record<string, Incident>>({})
   const [stages, setStages] = useState<Record<string, string>>({}) // incident → live stage
@@ -28,6 +29,7 @@ export function useAura(token: string | null) {
     switch (e.type) {
       case 'hello':
         setWatching(e.watching)
+        if (e.service) setService(e.service)
         setBeats(e.history || [])
         e.incidents.forEach(upsert)
         break
@@ -126,7 +128,7 @@ export function useAura(token: string | null) {
   }
 
   return {
-    status, watching, beats, incidents, stages, feed, chat, thinking, opened,
+    status, watching, service, beats, incidents, stages, feed, chat, thinking, opened,
     ask: (text: string, incidentId?: string) => { say('user', text); send({ type: 'chat', text, incident_id: incidentId }) },
     decide: (incidentId: string, decision: 'approved' | 'rejected', note = '') => send({ type: 'decide', incident_id: incidentId, decision, note }),
     load: (incidentId: string) => send({ type: 'get', incident_id: incidentId }),

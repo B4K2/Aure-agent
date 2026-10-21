@@ -11,6 +11,7 @@ export default defineConfig({
     proxy: {
       '/ws': { target: AURA, ws: true },
       '/incidents': AURA,
+      '/memory': AURA,
     },
   },
 })
