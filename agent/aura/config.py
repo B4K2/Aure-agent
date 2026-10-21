@@ -1,5 +1,6 @@
 """All runtime settings, from agent/.env (falls back to defaults that match the local demo stack)."""
 import os
+import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -34,7 +35,22 @@ NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "aura-dev-password")
 
-API_TOKEN = os.getenv("AURA_API_TOKEN", "dev-aura-token")
+
+
+def _api_token() -> str:
+    """AURA_API_TOKEN if set; otherwise a random token generated once and kept in .aura_state/api_token
+    (owner-only). A local aura-cli reads that file; the CLI's /web prints a dashboard link carrying it."""
+    if os.getenv("AURA_API_TOKEN"):
+        return os.environ["AURA_API_TOKEN"]
+    f = STATE_DIR / "api_token"
+    if not f.exists():
+        fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as out:
+            out.write(secrets.token_urlsafe(32))
+    return f.read_text().strip()
+
+
+API_TOKEN = _api_token()
 API_PORT = int(os.getenv("AURA_API_PORT", "8700"))
 
 POLL_SECONDS = float(os.getenv("AURA_POLL_SECONDS", "5"))

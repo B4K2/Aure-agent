@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/aura-logo.png" alt="Aura" width="480"></p>
+
 # Aura — Agentic SRE Co-pilot
 
 Aura watches a running app, detects anomalies, correlates them with recent deploys, recalls similar
@@ -14,6 +16,7 @@ so diagnosis gets faster and more confident over time.
 |---|---|
 | `agent/` | Python LangGraph pipeline + FastAPI server (port 8700), Qdrant/Neo4j memory, seed runbooks |
 | `aura-cli/` | Terminal UI (Ink/React): live incident feed, state panel, chat, `/approve` |
+| `web/` | Landing page + live web dashboard (Vite/React/Tailwind), black-and-white with light/dark mode |
 | `problem/` | Failure injector + virtual-user traffic simulator for the demo site |
 | `aura-technical-reference.md` | Full design reference (state object, agents, metrics) |
 
@@ -43,6 +46,37 @@ cd ../aura-cli && npm install && npm start
 
 Run the server on its own: `cd agent && uv run python -m aura.main`
 
+## Web dashboard
+
+```bash
+cd web && npm install && npm run dev      # http://localhost:5173 (landing) · /dashboard
+```
+
+The dashboard is another client of the agent server, just like the CLI: it opens the same `/ws`
+WebSocket with the same token. On first start the agent generates a random token into
+`agent/.aura_state/api_token` (owner-only, gitignored); a local `aura` CLI picks it up automatically.
+To sign a browser in, run **`/web`** in the CLI and open the link it prints
+(`/dashboard#token=…`; the token travels in the URL fragment, is saved by the dashboard and stripped
+from the address bar). Set `AURA_API_TOKEN` (agent and CLI env, or `~/.aura/config.json`) only for a
+remote agent; `AURA_WEB_URL` / `"web"` changes the dashboard address `/web` uses. The server broadcasts
+every event to every client, so an approval or rejection made in the terminal shows up in the browser
+instantly and vice versa. In dev, Vite proxies `/ws`, `/incidents` and `/memory` to `127.0.0.1:8700`
+(override with `AURA_URL`), so no CORS setup is needed.
+
+It shows live health metrics (p95, 5xx rate, RPS, memory, DB sessions), the incident list, each
+incident's hypothesis, confidence and its adjustments, evidence, proposed action with
+Approve / Reject (reason required) / Investigate, anomalies and the audit timeline, plus a chat
+panel and a live event feed.
+
+Two more tabs read Aura's long-term memory over REST (`/memory/*`, same token):
+
+- **Topology**: the Neo4j service dependency graph, colored by live health, with the blast radius
+  (everything upstream of a failing service) marked as impacted. Click a service for its root-cause
+  history, past incidents and deployments (including which deploy caused which incident).
+- **Memory**: every incident Aura has learned from (confirmed, rejected and inconclusive), filterable
+  by outcome and root cause, plus semantic search across past incidents and runbooks using the same
+  embeddings Aura retrieves with.
+
 ## Demo: break something and watch Aura fix it
 
 ```bash
@@ -61,8 +95,8 @@ Actions Aura can propose: `rollback`, `restart_service`, `terminate_db_sessions`
 
 ## Roadmap
 
-- **Web dashboard** — live incident feed, RCA trail with evidence, one-click approve/reject,
-  service dependency graph visualisation, incident history and memory search.
+- **Web dashboard** — ~~live incident feed, RCA trail with evidence, one-click approve/reject, service
+  dependency graph, incident history and memory search~~ (done, `web/`).
 - **Mobile app** — push notifications for new incidents and approve/reject from the phone,
   so on-call engineers can act without opening a laptop.
 - **Integrations** — Slack / Teams / email notifications and approvals.

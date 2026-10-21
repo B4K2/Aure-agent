@@ -70,3 +70,23 @@ def upsert_runbooks(chunks: list[dict]) -> None:
 def search_runbooks(question: str, limit: int = 3) -> list[dict]:
     res = client().query_points(RUNBOOKS, query=embed_query(question), limit=limit).points
     return [{**p.payload, "similarity": round(p.score, 3)} for p in res]
+
+
+def _bucket(payload: dict) -> str:
+    return "confirmed" if payload.get("confirmed") else "inconclusive" if payload.get("inconclusive") else "rejected"
+
+
+def all_incidents(limit: int = 500) -> list[dict]:
+    """Every remembered incident, newest first (dashboard history)."""
+    points, _ = client().scroll(INCIDENTS, limit=limit, with_payload=True, with_vectors=False)
+    out = [{**p.payload, "outcome": _bucket(p.payload)} for p in points]
+    return sorted(out, key=lambda m: m.get("timestamp", ""), reverse=True)
+
+
+def search_memory(q: str, limit: int = 8) -> dict:
+    """Free-text search over both collections, any service, no threshold: the human decides what's relevant."""
+    v = embed_query(q)
+    incidents = client().query_points(INCIDENTS, query=v, limit=limit).points
+    runbooks = client().query_points(RUNBOOKS, query=v, limit=limit).points
+    return {"incidents": [{**p.payload, "outcome": _bucket(p.payload), "similarity": round(p.score, 3)} for p in incidents],
+            "runbooks": [{**p.payload, "similarity": round(p.score, 3)} for p in runbooks]}

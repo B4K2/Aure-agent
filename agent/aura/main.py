@@ -3,6 +3,7 @@
     uv run python -m aura.main
 """
 import asyncio
+import hmac
 import logging
 import threading
 import time
@@ -250,8 +251,12 @@ aura = Aura()
 api = FastAPI(title="Aura")
 
 
+def _valid(token: str | None) -> bool:
+    return hmac.compare_digest((token or "").encode(), config.API_TOKEN.encode())
+
+
 def _auth(token: str | None) -> None:
-    if token != config.API_TOKEN:
+    if not _valid(token):
         raise HTTPException(401, "bad token")
 
 
@@ -292,27 +297,66 @@ def decide(iid: str, decision: str, request: Request, note: str = ""):
     return {"ok": True}
 
 
+def _memory(fn, *args):
+    try:
+        return fn(*args)
+    except Exception as e:  # Qdrant / Neo4j down: say so instead of a bare 500
+        log.warning("memory query failed: %s", e)
+        raise HTTPException(503, f"memory unavailable: {e}")
+
+
+@api.get("/memory/topology")
+def topology(request: Request):
+    _auth(request.headers.get("x-aura-token"))
+    from .memory import graph_db
+    return _memory(graph_db.topology)
+
+
+@api.get("/memory/services/{name}")
+def service(name: str, request: Request):
+    _auth(request.headers.get("x-aura-token"))
+    from .memory import graph_db
+    return _memory(graph_db.service_detail, name)
+
+
+@api.get("/memory/incidents")
+def history(request: Request):
+    _auth(request.headers.get("x-aura-token"))
+    from .memory import vector_db
+    return _memory(vector_db.all_incidents)
+
+
+@api.get("/memory/search")
+def search(q: str, request: Request):
+    _auth(request.headers.get("x-aura-token"))
+    from .memory import vector_db
+    if not q.strip():
+        raise HTTPException(400, "empty query")
+    return _memory(vector_db.search_memory, q.strip())
+
+
 @api.websocket("/ws")
 async def ws(sock: WebSocket):
-    if sock.query_params.get("token") != config.API_TOKEN:
+    await sock.accept()  # before closing: a pre-accept close is a bare HTTP 403 and clients never see 4401
+    if not _valid(sock.query_params.get("token")):
         await sock.close(code=4401)
         return
-    await sock.accept()
     aura.clients.add(sock)
     convo = Conversation(aura, lambda e: aura.emit(e))
-    await sock.send_json({"type": "hello", "watching": config.VOID_URL, "incidents": aura.list_incidents(),
+    await sock.send_json({"type": "hello", "watching": config.VOID_URL, "service": config.SERVICE, "incidents": aura.list_incidents(),
                          "history": list(aura.beats), "at": now()})
     loop = asyncio.get_running_loop()
     try:
         while True:
             msg = await sock.receive_json()
             if msg.get("type") == "chat":
-                await sock.send_json({"type": "thinking", "at": now()})
+                iid = msg.get("incident_id") or None  # None = the general thread
+                await sock.send_json({"type": "thinking", "incident_id": iid, "at": now()})
                 try:
-                    answer = await loop.run_in_executor(aura.pool, convo.send, msg["text"], msg.get("incident_id"))
+                    answer = await loop.run_in_executor(aura.pool, convo.send, msg["text"], iid)
                 except Exception as e:
                     answer = f"(LLM error: {e})"
-                await sock.send_json({"type": "answer", "text": answer, "at": now()})
+                await sock.send_json({"type": "answer", "text": answer, "incident_id": iid, "at": now()})
             elif msg.get("type") == "decide":
                 try:
                     aura.decide(msg["incident_id"], msg["decision"], msg.get("note") or "")

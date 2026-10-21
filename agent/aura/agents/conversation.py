@@ -60,7 +60,8 @@ class Conversation:
 
     def __init__(self, ctx, emit: Callable[[dict], None]):
         self.ctx, self.emit = ctx, emit
-        self.history: list[dict] = []
+        # one thread per incident plus a general one (key None), so context never bleeds between them
+        self.threads: dict[str | None, list[dict]] = {}
 
     def _tool(self, name: str, args: dict, incident_id: str | None) -> str:
         obs = self.ctx.observer
@@ -92,13 +93,14 @@ class Conversation:
         if incident_id and (inc := self.ctx.get_incident(incident_id)):
             focus = "Incident in focus:\n" + json.dumps({k: inc.get(k) for k in
                     ("incident_id", "anomalies_detected", "correlation", "rca", "dry_run", "execution_result")}, default=str)[:8000]
-        self.history.append({"role": "user", "content": text})
-        msgs = [{"role": "system", "content": SYSTEM.format(url=config.VOID_URL, focus=focus)}] + self.history[-30:]
+        history = self.threads.setdefault(incident_id, [])
+        history.append({"role": "user", "content": text})
+        msgs = [{"role": "system", "content": SYSTEM.format(url=config.VOID_URL, focus=focus)}] + history[-30:]
         for _ in range(8):
             msg = llm.chat(msgs, TOOLS)
             if not msg.tool_calls:
                 answer = msg.content or ""
-                self.history.append({"role": "assistant", "content": answer})
+                history.append({"role": "assistant", "content": answer})
                 return answer
             msgs.append({"role": "assistant", "content": msg.content or "",
                          "tool_calls": [tc.model_dump() for tc in msg.tool_calls]})
@@ -107,12 +109,12 @@ class Conversation:
                     args = json.loads(tc.function.arguments or "{}")
                 except json.JSONDecodeError:
                     args = {}
-                self.emit({"type": "tool", "name": tc.function.name, "args": args})
+                self.emit({"type": "tool", "name": tc.function.name, "args": args, "incident_id": incident_id})
                 try:
                     out = self._tool(tc.function.name, args, incident_id)
                 except Exception as e:
                     out = f"error: {e}"
                 msgs.append({"role": "tool", "tool_call_id": tc.id, "content": out[:8000]})
         answer = "(stopped after 8 tool steps — ask me to continue)"
-        self.history.append({"role": "assistant", "content": answer})
+        history.append({"role": "assistant", "content": answer})
         return answer

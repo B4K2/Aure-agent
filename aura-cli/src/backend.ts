@@ -10,12 +10,19 @@ import WebSocket from 'ws';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const AGENT_DIR = process.env.AURA_AGENT_DIR || path.resolve(here, '..', '..', 'agent');
 
-// ~/.aura/config.json → { "url": "http://host:8700", "token": "..." }; env wins (§15: config, not hardcoding).
+// ~/.aura/config.json → { "url": "http://host:8700", "token": "...", "web": "http://host:5173" }; env wins
+// (§15: config, not hardcoding). With no token configured, a local CLI uses the one the agent generated.
 function loadConfig() {
-  let file: { url?: string; token?: string } = {};
+  let file: { url?: string; token?: string; web?: string } = {};
   try { file = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.aura', 'config.json'), 'utf8')); } catch {}
   const url = (process.env.AURA_URL || file.url || 'http://127.0.0.1:8700').replace(/\/$/, '');
-  return { url, token: process.env.AURA_API_TOKEN || file.token || 'dev-aura-token', local: /127\.0\.0\.1|localhost/.test(url) };
+  const web = (process.env.AURA_WEB_URL || file.web || 'http://localhost:5173').replace(/\/$/, '');
+  return { url, web, token: process.env.AURA_API_TOKEN || file.token || '', local: /127\.0\.0\.1|localhost/.test(url) };
+}
+
+/** Re-read on every connect: a server we just spawned writes this file on its first boot. */
+function agentToken(): string {
+  try { return fs.readFileSync(path.join(AGENT_DIR, '.aura_state', 'api_token'), 'utf8').trim(); } catch { return ''; }
 }
 
 export type AuraEvent = { type: string; at?: string; [k: string]: any };
@@ -37,9 +44,15 @@ export class Backend {
     this.ws.send(JSON.stringify(msg));
   }
 
+  /** The token this CLI connects with: configured, or (local agent) the one the agent generated. */
+  token(): string { return this.cfg.token || (this.cfg.local ? agentToken() : ''); }
+
+  /** Dashboard link that signs the browser in; the token rides in the fragment, which is never sent to a server. */
+  webLink(): string { return `${this.cfg.web}/dashboard#token=${encodeURIComponent(this.token())}`; }
+
   private connect() {
     if (this.closed) return;
-    const ws = new WebSocket(`${this.cfg.url.replace(/^http/, 'ws')}/ws?token=${encodeURIComponent(this.cfg.token)}`);
+    const ws = new WebSocket(`${this.cfg.url.replace(/^http/, 'ws')}/ws?token=${encodeURIComponent(this.token())}`);
     this.ws = ws;
     ws.on('open', () => this.onStatus('connected'));
     ws.on('message', (data) => { try { this.onEvent(JSON.parse(data.toString())); } catch {} });

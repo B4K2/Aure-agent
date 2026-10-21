@@ -6,11 +6,11 @@
     .s{fill:#8b949e;font-size:11px;text-anchor:middle}
     .wire{stroke:#30363d;stroke-width:2;fill:none}
     .hl{fill:none;stroke:#58a6ff;stroke-width:3;rx:10;opacity:0;animation:glow 12s infinite}
-    @keyframes glow{0%,100%{opacity:0}3%,12%{opacity:1}16%{opacity:0}}
-    .d1{animation-delay:0s}.d2{animation-delay:1.7s}.d3{animation-delay:3.4s}.d4{animation-delay:5.1s}
-    .d5{animation-delay:6.8s}.d6{animation-delay:8.5s}.d7{animation-delay:10.2s}
+    @keyframes glow{0%,100%{opacity:0}1%,7%{opacity:1}9%{opacity:0}}
+    .d1{animation-delay:0s}.d2{animation-delay:1.68s}.d3{animation-delay:3.36s}.d4{animation-delay:5.04s}
+    .d5{animation-delay:6.72s}.d6{animation-delay:8.4s}.d7{animation-delay:10.08s}
     .alert{fill:#f85149;font-size:12px;font-weight:600;opacity:0;animation:pop 12s infinite}
-    .ok{fill:#3fb950;font-size:12px;font-weight:600;opacity:0;animation:pop 12s infinite;animation-delay:10.2s}
+    .ok{fill:#3fb950;font-size:12px;font-weight:600;opacity:0;animation:pop 12s infinite;animation-delay:10.08s}
     @keyframes pop{0%,100%{opacity:0}2%,14%{opacity:1}18%{opacity:0}}
   </style>
   <rect class="bg" width="900" height="300" rx="12"/>
@@ -38,7 +38,7 @@
   <!-- moving packet -->
   <circle r="7" fill="#58a6ff">
     <animateMotion dur="12s" repeatCount="indefinite"
-      keyPoints="0;0;0.2;0.2;0.4;0.4;0.6;0.6;0.7;0.7;0.85;0.85;1;1" keyTimes="0;0.08;0.14;0.22;0.28;0.36;0.42;0.5;0.56;0.64;0.7;0.78;0.85;1" calcMode="linear"
+      keyPoints="0;0;0.18;0.18;0.36;0.36;0.54;0.54;0.64;0.64;0.82;0.82;1;1" keyTimes="0;0.08;0.14;0.22;0.28;0.36;0.42;0.5;0.56;0.64;0.7;0.78;0.84;1" calcMode="linear"
       path="M105 140 H305 H505 H705 V250 H505 H305"/>
   </circle>
 
