@@ -32,8 +32,18 @@ const time = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString([], { hou
 const pct = (v: number) => `${(v * 100).toFixed(v < 0.01 ? 2 : 1)}%`
 const ms = (v: number) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`)
 
+/** `aura` CLI's /web opens /dashboard#token=…: keep the token, then drop it from the URL and history. */
+function initialToken() {
+  const m = location.hash.match(/^#token=(.+)$/)
+  if (m) {
+    localStorage.setItem('aura-token', decodeURIComponent(m[1]))
+    history.replaceState(null, '', location.pathname)
+  }
+  return localStorage.getItem('aura-token')
+}
+
 export default function Dashboard() {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('aura-token'))
+  const [token, setToken] = useState<string | null>(initialToken)
   const aura = useAura(token)
 
   if (!token || aura.status === 'bad token') {

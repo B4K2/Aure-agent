@@ -3,6 +3,7 @@
     uv run python -m aura.main
 """
 import asyncio
+import hmac
 import logging
 import threading
 import time
@@ -250,8 +251,12 @@ aura = Aura()
 api = FastAPI(title="Aura")
 
 
+def _valid(token: str | None) -> bool:
+    return hmac.compare_digest((token or "").encode(), config.API_TOKEN.encode())
+
+
 def _auth(token: str | None) -> None:
-    if token != config.API_TOKEN:
+    if not _valid(token):
         raise HTTPException(401, "bad token")
 
 
@@ -332,10 +337,10 @@ def search(q: str, request: Request):
 
 @api.websocket("/ws")
 async def ws(sock: WebSocket):
-    if sock.query_params.get("token") != config.API_TOKEN:
+    await sock.accept()  # before closing: a pre-accept close is a bare HTTP 403 and clients never see 4401
+    if not _valid(sock.query_params.get("token")):
         await sock.close(code=4401)
         return
-    await sock.accept()
     aura.clients.add(sock)
     convo = Conversation(aura, lambda e: aura.emit(e))
     await sock.send_json({"type": "hello", "watching": config.VOID_URL, "service": config.SERVICE, "incidents": aura.list_incidents(),

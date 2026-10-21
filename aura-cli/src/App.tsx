@@ -19,6 +19,7 @@ const HELP = `/approve [id]   run the proposed action (dry-run shown first)
 /state          live graphs of site health (toggle)
 /incidents      list incidents        /show [id]   full RCA
 /trail [id]     audit trail           /clear       clear screen
+/web            dashboard link (signs the browser in)
 /help           this help             /quit        exit (Ctrl-C)
 Anything else is sent to Aura as chat.`;
 
@@ -207,6 +208,10 @@ export function App() {
         setFocus(id);
         backend.send({ type: 'chat', incident_id: id, text: INVESTIGATE });
         setBusy('Aura is investigating');
+        break;
+      case 'web':
+        if (!backend.token()) return push(<Text color="yellow">no token yet: start the agent once (it generates one), or set AURA_API_TOKEN</Text>);
+        push(<Box flexDirection="column"><Text>open the dashboard (signs this browser in):</Text><Text color="cyan">{backend.webLink()}</Text><Text dimColor>this link is a credential: don't share it</Text></Box>);
         break;
       case 'help': push(<Text dimColor>{HELP}</Text>); break;
       case 'quit': case 'exit': exit(); break;

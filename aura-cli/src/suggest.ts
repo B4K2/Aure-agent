@@ -9,6 +9,7 @@ const BASE: Omit<Suggestion, 'label'>[] = [
   { value: '/trail', hint: 'audit trail: what Aura did and why' },
   { value: '/focus ', hint: 'chat about a specific incident' },
   { value: '/clear', hint: 'clear the screen' },
+  { value: '/web', hint: 'link that opens the web dashboard, signed in' },
   { value: '/help', hint: 'all commands' },
   { value: '/quit', hint: 'exit' },
 ];

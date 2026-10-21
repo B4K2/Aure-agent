@@ -53,10 +53,15 @@ cd web && npm install && npm run dev      # http://localhost:5173 (landing) · /
 ```
 
 The dashboard is another client of the agent server, just like the CLI: it opens the same `/ws`
-WebSocket with the same token (`AURA_API_TOKEN`, default `dev-aura-token`, asked for once on first
-visit). The server broadcasts every event to every client, so an approval or rejection made in the
-terminal shows up in the browser instantly and vice versa. In dev, Vite proxies `/ws`,
-`/incidents` and `/memory` to `127.0.0.1:8700` (override with `AURA_URL`), so no CORS setup is needed.
+WebSocket with the same token. On first start the agent generates a random token into
+`agent/.aura_state/api_token` (owner-only, gitignored); a local `aura` CLI picks it up automatically.
+To sign a browser in, run **`/web`** in the CLI and open the link it prints
+(`/dashboard#token=…`; the token travels in the URL fragment, is saved by the dashboard and stripped
+from the address bar). Set `AURA_API_TOKEN` (agent and CLI env, or `~/.aura/config.json`) only for a
+remote agent; `AURA_WEB_URL` / `"web"` changes the dashboard address `/web` uses. The server broadcasts
+every event to every client, so an approval or rejection made in the terminal shows up in the browser
+instantly and vice versa. In dev, Vite proxies `/ws`, `/incidents` and `/memory` to `127.0.0.1:8700`
+(override with `AURA_URL`), so no CORS setup is needed.
 
 It shows live health metrics (p95, 5xx rate, RPS, memory, DB sessions), the incident list, each
 incident's hypothesis, confidence and its adjustments, evidence, proposed action with
