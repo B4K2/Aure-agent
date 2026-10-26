@@ -63,6 +63,7 @@ class KubernetesRuntime:
         if config.K8S_CONTEXT:
             self.base += ["--context", config.K8S_CONTEXT]
         self.deploy = f"deployment/{config.K8S_APP_DEPLOYMENT}"
+        self.restarts: dict[str, int] = {}  # pod -> container restarts already seen
         self.log_since = _ts(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"))
 
     def _kubectl(self, *args: str, timeout: float = 10) -> subprocess.CompletedProcess:
@@ -80,12 +81,20 @@ class KubernetesRuntime:
     def new_log_lines(self) -> list[str]:
         """Every pod behind the app's selector, since the newest line already seen. --timestamps gives each
         line an RFC3339 prefix to track that cursor; it's stripped so lines look like the local server log."""
-        out = self._kubectl("logs", "-l", config.K8S_APP_SELECTOR, "--all-containers", "--timestamps",
-                            "--tail=-1", f"--since-time={self.log_since}", "--max-log-requests=20")
+        since = ["--timestamps", "--tail=-1", f"--since-time={self.log_since}"]
+        out = self._kubectl("logs", "-l", config.K8S_APP_SELECTOR, "--all-containers", *since, "--max-log-requests=20")
         if out.returncode != 0:
             return []
+        raw = out.stdout.splitlines()
+        # A crashed container's last words (the error that killed it) are only in --previous.
+        pods = self._kubectl("get", "pods", "-l", config.K8S_APP_SELECTOR, "-o",
+                             'jsonpath={range .items[*]}{.metadata.name} {.status.containerStatuses[0].restartCount}{"\\n"}{end}')
+        for name, _, count in (l.partition(" ") for l in pods.stdout.splitlines()):
+            if count.isdigit() and int(count) > self.restarts.get(name, 0):
+                self.restarts[name] = int(count)
+                raw += self._kubectl("logs", name, "--previous", *since).stdout.splitlines()
         lines = []
-        for line in out.stdout.splitlines():
+        for line in raw:
             ts, _, text = line.partition(" ")
             ts = _ts(ts)
             if ts > self.log_since:  # --since-time is inclusive and only second-precise

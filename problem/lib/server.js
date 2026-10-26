@@ -2,7 +2,8 @@
 // (needed after code-patch scenarios — a "deploy"). Supports plain node and the docker-compose app.
 import fs from 'node:fs';
 import { execFileSync, spawn } from 'node:child_process';
-import { BASE_URL, PORT, WEBSITE_DIR, APP_CONTAINER, sleep } from './config.js';
+import { BASE_URL, PORT, WEBSITE_DIR, APP_CONTAINER, RUNTIME, sleep } from './config.js';
+import { deploy } from './k8s.js';
 import { statePath, readJSON, writeJSON } from './state.js';
 
 const LAUNCH = statePath('server-launch.json');
@@ -21,6 +22,7 @@ function listeningPid() {
 
 /** Record how the server was started so we can start it again even after it crashed. */
 export function snapshot() {
+  if (RUNTIME === 'kubernetes') return null;
   const pid = listeningPid();
   if (!pid) return readJSON(LAUNCH, null);
   try {
@@ -42,7 +44,10 @@ async function waitFor(pred, ms) {
 
 /** Restart (or start) the website. Returns true if it comes back healthy. */
 export async function restart({ expectDown = false, beforeStart } = {}) {
-  if (dockerApp()) {
+  if (RUNTIME === 'kubernetes') {
+    await beforeStart?.();
+    deploy({ waitSec: expectDown ? 30 : 120 });
+  } else if (dockerApp()) {
     console.log('  rebuilding docker app container (docker compose --profile app up -d --build app)…');
     execFileSync('docker', ['compose', '--profile', 'app', 'up', '-d', '--build', 'app'], { cwd: WEBSITE_DIR, stdio: 'inherit' });
   } else {
