@@ -1,0 +1,91 @@
+# Aura's memory stores: Qdrant (incident + runbook vectors) and Neo4j (causal graph).
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant
+  namespace: aura
+spec:
+  selector: { app: qdrant }
+  ports:
+    - { name: http, port: 6333 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qdrant
+  namespace: aura
+spec:
+  serviceName: qdrant
+  replicas: 1
+  selector:
+    matchLabels: { app: qdrant }
+  template:
+    metadata:
+      labels: { app: qdrant }
+    spec:
+      containers:
+        - name: qdrant
+          image: qdrant/qdrant:v1.15.5
+          ports:
+            - containerPort: 6333
+          readinessProbe:
+            httpGet: { path: /readyz, port: 6333 }
+          volumeMounts:
+            - { name: data, mountPath: /qdrant/storage }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: { storage: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neo4j
+  namespace: aura
+spec:
+  selector: { app: neo4j }
+  ports:
+    - { name: bolt, port: 7687 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: neo4j
+  namespace: aura
+spec:
+  serviceName: neo4j
+  replicas: 1
+  selector:
+    matchLabels: { app: neo4j }
+  template:
+    metadata:
+      labels: { app: neo4j }
+    spec:
+      # Service links would add NEO4J_PORT_7687_TCP_* env vars, which neo4j reads as (invalid) settings.
+      enableServiceLinks: false
+      containers:
+        - name: neo4j
+          image: neo4j:5
+          env:
+            - name: AUTH_PASSWORD  # not NEO4J_*: neo4j treats every NEO4J_ var as a setting
+              valueFrom: { secretKeyRef: { name: aura-secrets, key: NEO4J_PASSWORD } }
+            - { name: NEO4J_AUTH, value: neo4j/$(AUTH_PASSWORD) }
+            - { name: NEO4J_server_memory_heap_max__size, value: 512m }
+            - { name: NEO4J_server_memory_pagecache_size, value: 256m }
+          ports:
+            - containerPort: 7687
+          readinessProbe:
+            tcpSocket: { port: 7687 }
+            periodSeconds: 5
+          volumeMounts:
+            - { name: data, mountPath: /data }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: { storage: 2Gi }

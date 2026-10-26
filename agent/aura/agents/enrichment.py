@@ -4,6 +4,7 @@ import subprocess
 from datetime import datetime, timezone
 
 from .. import config
+from ..runtime import runtime
 from ..memory import graph_db, vector_db
 from ..state import AuraState, audit
 
@@ -17,7 +18,10 @@ def _git(*args: str) -> str:
 
 
 def recent_commits(n: int = 5) -> list[dict]:
-    """Diff SUMMARY per commit (files + added/removed + message), not the full diff (§6)."""
+    """Diff SUMMARY per commit (files + added/removed + message), not the full diff (§6).
+    Without a checkout of the site (Aura running in the cluster), the Deployment's rollout history."""
+    if not (config.WEBSITE_DIR / ".git").exists() and hasattr(runtime, "deploy_history"):
+        return runtime.deploy_history(n)
     out = []
     for line in _git("log", f"-{n}", "--format=%h%x1f%cI%x1f%an%x1f%s").splitlines():
         h, ts, author, msg = line.split("\x1f")

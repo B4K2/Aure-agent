@@ -113,7 +113,7 @@ function spark(values: number[]) {
 }
 
 /** Live /state panel: it keeps ticking while it's the newest thing on screen. */
-function StatePanel({ target, live }: { target: Metrics; live: boolean }) {
+function StatePanel({ target, live, onClose }: { target: Metrics; live: boolean; onClose: () => void }) {
   const [hist, setHist] = useState<Metrics[]>(() => Array.from({ length: 32 }, () => jitter(BASE)))
   useEffect(() => {
     if (!live) return
@@ -130,6 +130,13 @@ function StatePanel({ target, live }: { target: Metrics; live: boolean }) {
   ]
   return (
     <div className="my-1">
+      <div className="flex items-center gap-3 text-neutral-600">
+        <span>{live ? '● live' : 'snapshot'}</span>
+        <button onClick={(e) => (e.stopPropagation(), onClose())}
+          className="ml-auto rounded border border-white/10 px-2 leading-5 text-neutral-400 hover:border-white/30 hover:text-white">
+          close · esc
+        </button>
+      </div>
       {rows.map(([label, key, fmt, warn]) => (
         <div key={key} className="flex gap-3 sm:gap-4">
           <span className="w-16 shrink-0 text-neutral-500 sm:w-20">{label}</span>
@@ -182,6 +189,7 @@ export default function Terminal() {
   const [handled, setHandled] = useState<string[]>([])
   const cancelled = useRef(false)
 
+  const lastState = entries.reduce((last, e, i) => ('state' in e ? i : last), -1)
   const target = useMemo<Metrics>(() => ({ ...BASE, ...(active ? SCENARIOS[active].metrics : {}) }), [active])
 
   async function type(lines: Line[]) {
@@ -198,6 +206,7 @@ export default function Terminal() {
   }
 
   const print = (lines: Line[]) => setEntries((prev) => [...prev, ...lines])
+  const closeState = () => setEntries((prev) => prev.filter((e) => !('state' in e)))
 
   async function inject(name: string) {
     const s = SCENARIOS[name]
@@ -215,7 +224,10 @@ export default function Terminal() {
     else if (c === '/clear') setEntries([])
     else if (c === '/scenarios')
       print(Object.entries(SCENARIOS).map(([n, s]) => ({ text: row(n, s.summary, 24), tone: 'dim' as Tone })))
-    else if (c === '/state') setEntries((prev) => [...prev, { state: true }])
+    else if (c === '/state') {
+      if (lastState >= 0 && lastState === entries.length - 1) closeState() // /state again toggles it off
+      else setEntries((prev) => [...prev, { state: true }])
+    }
     else if (c === '/incidents')
       print(handled.length ? handled.map((h, i) => ({ text: `  INC-${String(i + 1).padStart(4, '0')}  ${h}`, tone: 'dim' as Tone }))
         : [{ text: '  none yet: try /inject db-lock', tone: 'dim' }])
@@ -278,6 +290,7 @@ export default function Terminal() {
 
   function onKey(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') submit(cmd)
+    else if (e.key === 'Escape') closeState()
     else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault()
       const p = Math.max(-1, Math.min(history.length - 1, histPos + (e.key === 'ArrowUp' ? 1 : -1)))
@@ -296,7 +309,6 @@ export default function Terminal() {
   const tone: Record<Tone, string> = {
     dim: 'text-neutral-500', bright: 'text-white', prompt: 'text-white font-medium', ok: 'text-emerald-400', bad: 'text-red-400',
   }
-  const lastState = entries.reduce((last, e, i) => ('state' in e ? i : last), -1)
 
   return (
     <div ref={ref} className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950 shadow-[0_0_120px_-40px_rgba(255,255,255,0.25)]">
@@ -311,7 +323,7 @@ export default function Terminal() {
         className="h-[420px] cursor-text overflow-y-auto p-4 font-mono text-[11px] leading-6 break-words whitespace-pre-wrap sm:h-[380px] sm:p-6 sm:text-[13px] sm:leading-7 xl:overflow-x-auto xl:whitespace-pre">
         {entries.map((e, i) =>
           'state' in e ? (
-            <StatePanel key={i} target={target} live={i === lastState && i === entries.length - 1} />
+            <StatePanel key={i} target={target} live={i === lastState && i === entries.length - 1} onClose={closeState} />
           ) : (
             <TermLine key={i} text={e.text} className={tone[e.tone ?? 'dim']} />
           ),

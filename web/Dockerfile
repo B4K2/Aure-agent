@@ -1,0 +1,11 @@
+# The dashboard behind nginx, which forwards the agent's API and WebSocket (same origin, as in vite dev).
+FROM node:24-slim AS build
+WORKDIR /web
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:1.29-alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /web/dist /usr/share/nginx/html

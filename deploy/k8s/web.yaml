@@ -1,0 +1,32 @@
+# The dashboard. NodePort 30870 (published on localhost by up.sh's minikube); open it with the
+# token link from: kubectl -n aura exec deploy/aura-agent -- cat .aura_state/api_token
+apiVersion: v1
+kind: Service
+metadata:
+  name: aura-web
+  namespace: aura
+spec:
+  type: NodePort
+  selector: { app: aura-web }
+  ports:
+    - { port: 8080, nodePort: 30870 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aura-web
+  namespace: aura
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: aura-web }
+  template:
+    metadata:
+      labels: { app: aura-web }
+    spec:
+      containers:
+        - name: web
+          image: aura-web
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080

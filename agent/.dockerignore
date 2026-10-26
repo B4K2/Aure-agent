@@ -1,0 +1,6 @@
+.env
+.venv
+.aura_state
+neo4j_data
+qdrant_storage
+**/__pycache__

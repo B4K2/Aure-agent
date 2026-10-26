@@ -59,6 +59,7 @@ def _api_token() -> str:
 
 API_TOKEN = _api_token()
 API_PORT = int(os.getenv("AURA_API_PORT", "8700"))
+API_HOST = os.getenv("AURA_API_HOST", "127.0.0.1")  # 0.0.0.0 in a container
 
 POLL_SECONDS = float(os.getenv("AURA_POLL_SECONDS", "5"))
 DEBOUNCE_SECONDS = 12         # §12: let a burst settle before enrichment

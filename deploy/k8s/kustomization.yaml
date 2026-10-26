@@ -1,0 +1,13 @@
+# Aura on Kubernetes: kubectl apply -k deploy/k8s (or bash deploy/k8s/up.sh for minikube).
+# The watched app's namespace (void) is spelled out in rbac.yaml and agent.yaml; change both together.
+resources:
+  - namespace.yaml
+  - memory.yaml
+  - rbac.yaml
+  - agent.yaml
+  - web.yaml
+images:
+  - name: aura-agent
+    newTag: dev
+  - name: aura-web
+    newTag: dev

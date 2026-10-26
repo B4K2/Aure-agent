@@ -1,0 +1,67 @@
+# The agent. Secrets (LLM key, HF token, Neo4j password, API token) come from aura-secrets, which
+# up.sh creates from agent/.env. /app/.aura_state keeps the API token, logs and the HF model cache.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: aura-state
+  namespace: aura
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests: { storage: 5Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aura-agent
+  namespace: aura
+spec:
+  selector: { app: aura-agent }
+  ports:
+    - { name: http, port: 8700 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aura-agent
+  namespace: aura
+spec:
+  replicas: 1  # it holds open incidents in memory; never more than one
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: aura-agent }
+  template:
+    metadata:
+      labels: { app: aura-agent }
+    spec:
+      serviceAccountName: aura-agent
+      containers:
+        - name: agent
+          image: aura-agent
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef: { name: aura-secrets }
+          env:
+            - { name: AURA_RUNTIME, value: kubernetes }
+            - { name: K8S_NAMESPACE, value: void }
+            - { name: K8S_APP_DEPLOYMENT, value: void-app }
+            - { name: K8S_APP_SELECTOR, value: app=void-app }
+            - { name: K8S_DB_STATEFULSET, value: void-db }
+            - { name: VOID_URL, value: "http://void-app.void:4000" }
+            - { name: DATABASE_URL, value: "postgres://void:void@void-db.void:5432/void" }
+            - { name: QDRANT_URL, value: "http://qdrant:6333" }
+            - { name: NEO4J_URI, value: "bolt://neo4j:7687" }
+          ports:
+            - containerPort: 8700
+          startupProbe:  # first boot downloads the embedding model
+            tcpSocket: { port: 8700 }
+            periodSeconds: 10
+            failureThreshold: 60
+          resources:
+            requests: { memory: 1500Mi }
+            limits: { memory: 3Gi }
+          volumeMounts:
+            - { name: state, mountPath: /app/.aura_state }
+      volumes:
+        - name: state
+          persistentVolumeClaim: { claimName: aura-state }

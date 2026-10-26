@@ -2,6 +2,7 @@
 Observability and Execution go through this; nothing else knows about docker or kubectl.
 AURA_RUNTIME=docker|kubernetes picks one. kubectl uses KUBECONFIG/~/.kube/config outside the cluster
 (e.g. Aura on EC2) and the pod's ServiceAccount inside it."""
+import json
 import subprocess
 from datetime import datetime, timezone
 
@@ -117,6 +118,25 @@ class KubernetesRuntime:
 
     def show(self, cmd: list[str]) -> str:
         return " ".join(cmd)
+
+    def deploy_history(self, n: int) -> list[dict]:
+        """Deploys as the cluster saw them, for an agent with no checkout of the site's repo: one per
+        ReplicaSet of the Deployment, newest revision first. change-cause is "<commit> <message>"."""
+        out = self._kubectl("get", "replicasets", "-l", config.K8S_APP_SELECTOR, "-o", "json")
+        if out.returncode != 0:
+            return []
+        rows = []
+        for rs in json.loads(out.stdout)["items"]:
+            meta = rs["metadata"]
+            if not any(o.get("name") == config.K8S_APP_DEPLOYMENT for o in meta.get("ownerReferences", [])):
+                continue
+            ann = meta.get("annotations", {})
+            commit, _, msg = ann.get("kubernetes.io/change-cause", "").partition(" ")
+            image = rs["spec"]["template"]["spec"]["containers"][0]["image"]
+            rows.append((int(ann.get("deployment.kubernetes.io/revision", 0)),
+                         {"hash": commit or image.rpartition(":")[2], "timestamp": meta["creationTimestamp"].replace("Z", "+00:00"),
+                          "author": "", "message": msg or f"image {image}", "files": [], "diff_summary": f"image {image}"}))
+        return [r for _, r in sorted(rows, key=lambda r: -r[0])[:n]]
 
     def rollback_preview(self, action: dict) -> str:
         out = self._kubectl("rollout", "history", self.deploy)

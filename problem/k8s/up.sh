@@ -12,7 +12,7 @@ if [[ "${1:-}" == down ]]; then exec minikube delete -p "$profile"; fi
 
 # The NodePorts are published on localhost: the node's own IP is often unreachable from the host.
 minikube status -p "$profile" >/dev/null 2>&1 ||
-  minikube start -p "$profile" --driver=docker --cpus=4 --memory=6g --ports=30400:30400,30433:30433
+  minikube start -p "$profile" --driver=docker --cpus=4 --memory=7g --ports=30400:30400,30433:30433,30870:30870
 kubectl config use-context "$profile" >/dev/null
 
 ip=127.0.0.1

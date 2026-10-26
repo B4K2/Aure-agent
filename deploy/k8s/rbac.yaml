@@ -1,0 +1,38 @@
+# What the agent may do in the watched namespace: read pods/logs/workloads, and the three remediations
+# (rollout undo / restart of the app Deployment, scaling the DB StatefulSet). Nothing else.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aura-agent
+  namespace: aura
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: aura-agent
+  namespace: void
+rules:
+  - apiGroups: [""]
+    resources: [pods, pods/log]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, controllerrevisions]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets]
+    verbs: [patch, update]
+  - apiGroups: [apps]
+    resources: [statefulsets/scale]
+    verbs: [get, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: aura-agent
+  namespace: void
+subjects:
+  - { kind: ServiceAccount, name: aura-agent, namespace: aura }
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: aura-agent
