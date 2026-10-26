@@ -39,16 +39,16 @@ const FEATURES = [
 function Nav() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-white/5 bg-black/60 backdrop-blur-xl">
-      <nav className="mx-auto flex h-18 max-w-7xl items-center justify-between px-6">
+      <nav className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
         <Logo />
         <div className="hidden items-center gap-8 text-sm text-neutral-400 md:flex">
           <a href="#how" className="transition-colors hover:text-white">How it works</a>
           <a href="#features" className="transition-colors hover:text-white">Features</a>
           <a href="#demo" className="transition-colors hover:text-white">Demo</a>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <ThemeToggle />
-          <a href="/dashboard" className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-black transition-opacity hover:opacity-85">
+          <a href="/dashboard" className="rounded-full bg-white px-3 py-1.5 sm:px-4 text-sm font-medium text-black transition-opacity hover:opacity-85">
             Dashboard
           </a>
         </div>
@@ -183,7 +183,7 @@ function ScrollTilt({ children }: { children: React.ReactNode }) {
   const scale = useTransform(scrollYProgress, [0, 1], [0.86, 1])
   const opacity = useTransform(scrollYProgress, [0, 0.5], [0, 1])
   return (
-    <div ref={ref} style={{ perspective: 1200 }}>
+    <div ref={ref} className="min-w-0" style={{ perspective: 1200 }}>
       <motion.div style={{ rotateX, scale, opacity }}>{children}</motion.div>
     </div>
   )
@@ -191,7 +191,7 @@ function ScrollTilt({ children }: { children: React.ReactNode }) {
 
 function Demo() {
   return (
-    <section id="demo" className="mx-auto grid max-w-7xl items-center gap-16 px-6 py-40 lg:grid-cols-[1fr_1.3fr]">
+    <section id="demo" className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-28 sm:px-6 md:py-40 lg:grid-cols-[1fr_1.3fr] lg:gap-16">
       <div>
         <Reveal>
           <div className="mb-6 font-mono text-xs tracking-widest text-neutral-500 uppercase">Demo</div>

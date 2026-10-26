@@ -89,16 +89,19 @@ const SCENARIOS: Record<string, Scenario> = {
   },
 }
 
+/** A command-table row. No-break padding: TermLine leaves it alone (it only splits on plain spaces). */
+const row = (left: string, right: string, width = 22) => `  ${left.padEnd(width, '\u00a0')}${right}`
+
 const INTRO = 'bad-deploy-checkout-500'
 const HELP: Line[] = [
   { text: 'commands', tone: 'bright' },
-  { text: '  /scenarios            what you can break', tone: 'dim' },
-  { text: '  /inject <scenario>    break the demo shop and watch Aura respond', tone: 'dim' },
-  { text: '  /approve              run the proposed fix', tone: 'dim' },
-  { text: '  /reject <reason>      decline it; the reason is stored in memory', tone: 'dim' },
-  { text: '  /state                live graphs: traffic, latency, errors, memory, db', tone: 'dim' },
-  { text: '  /incidents            what Aura handled this session', tone: 'dim' },
-  { text: '  /clear                clear the screen', tone: 'dim' },
+  { text: row('/scenarios', 'what you can break'), tone: 'dim' },
+  { text: row('/inject <scenario>', 'break the demo shop and watch Aura respond'), tone: 'dim' },
+  { text: row('/approve', 'run the proposed fix'), tone: 'dim' },
+  { text: row('/reject <reason>', 'decline it; the reason is stored in memory'), tone: 'dim' },
+  { text: row('/state', 'live graphs: traffic, latency, errors, memory, db'), tone: 'dim' },
+  { text: row('/incidents', 'what Aura handled this session'), tone: 'dim' },
+  { text: row('/clear', 'clear the screen'), tone: 'dim' },
 ]
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -128,10 +131,13 @@ function StatePanel({ target, live }: { target: Metrics; live: boolean }) {
   return (
     <div className="my-1">
       {rows.map(([label, key, fmt, warn]) => (
-        <div key={key} className="flex gap-4">
-          <span className="w-20 text-neutral-500">{label}</span>
-          <span className={warn && now[key] > warn ? 'text-red-400' : 'text-white'}>{spark(hist.map((m) => m[key]))}</span>
-          <span className="text-neutral-400">{fmt(now[key])}</span>
+        <div key={key} className="flex gap-3 sm:gap-4">
+          <span className="w-16 shrink-0 text-neutral-500 sm:w-20">{label}</span>
+          {/* right-aligned in a clipping box: narrow screens drop the oldest bars, not the newest */}
+          <span className="flex min-w-0 justify-end overflow-hidden">
+            <span className={warn && now[key] > warn ? 'text-red-400' : 'text-white'}>{spark(hist.map((m) => m[key]))}</span>
+          </span>
+          <span className="w-18 shrink-0 text-neutral-400">{fmt(now[key])}</span>
         </div>
       ))}
     </div>
@@ -147,6 +153,18 @@ function ease(cur: Metrics, target: Metrics): Metrics {
 function jitter(m: Metrics): Metrics {
   const j = (v: number, f: number) => Math.max(0, v * (1 + (Math.random() - 0.5) * f))
   return { rps: j(m.rps, 0.15), p95: j(m.p95, 0.2), err: j(m.err, 0.3), rss: j(m.rss, 0.02), db: j(m.db, 0.1) }
+}
+
+/** "  label       value" rows become two columns, so a value that wraps stays under its column. */
+function TermLine({ text, className }: { text: string; className: string }) {
+  const m = text.match(/^(\S? *\S+)( {3,})(.*)$/)
+  if (!m) return <div className={className}>{text}</div>
+  return (
+    <div className={`flex ${className}`}>
+      <span className="w-[13ch] shrink-0 whitespace-pre sm:w-[17ch]">{m[1]}</span>
+      <span className="min-w-0">{m[3]}</span>
+    </div>
+  )
 }
 
 export default function Terminal() {
@@ -196,7 +214,7 @@ export default function Terminal() {
     if (c === '/help' || c === 'help') print(HELP)
     else if (c === '/clear') setEntries([])
     else if (c === '/scenarios')
-      print(Object.entries(SCENARIOS).map(([n, s]) => ({ text: `  ${n.padEnd(24)}${s.summary}`, tone: 'dim' as Tone })))
+      print(Object.entries(SCENARIOS).map(([n, s]) => ({ text: row(n, s.summary, 24), tone: 'dim' as Tone })))
     else if (c === '/state') setEntries((prev) => [...prev, { state: true }])
     else if (c === '/incidents')
       print(handled.length ? handled.map((h, i) => ({ text: `  INC-${String(i + 1).padStart(4, '0')}  ${h}`, tone: 'dim' as Tone }))
@@ -282,31 +300,31 @@ export default function Terminal() {
 
   return (
     <div ref={ref} className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950 shadow-[0_0_120px_-40px_rgba(255,255,255,0.25)]">
-      <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3">
+      <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3 sm:px-5">
         <span className="size-2.5 rounded-full bg-white/20" />
         <span className="size-2.5 rounded-full bg-white/20" />
         <span className="size-2.5 rounded-full bg-white/20" />
-        <span className="ml-3 font-mono text-xs text-neutral-500">aura — incident feed</span>
-        {active && <span className="ml-auto font-mono text-xs text-red-400">● {active}</span>}
+        <span className="ml-3 truncate font-mono text-xs text-neutral-500">aura — incident feed</span>
+        {active && <span className="ml-auto truncate font-mono text-xs text-red-400">● {active}</span>}
       </div>
       <pre ref={scroller} onClick={() => input.current?.focus()}
-        className="h-[380px] cursor-text overflow-x-auto overflow-y-auto p-6 font-mono text-[13px] leading-7">
+        className="h-[420px] cursor-text overflow-y-auto p-4 font-mono text-[11px] leading-6 break-words whitespace-pre-wrap sm:h-[380px] sm:p-6 sm:text-[13px] sm:leading-7 xl:overflow-x-auto xl:whitespace-pre">
         {entries.map((e, i) =>
           'state' in e ? (
             <StatePanel key={i} target={target} live={i === lastState && i === entries.length - 1} />
           ) : (
-            <div key={i} className={tone[e.tone ?? 'dim']}>{e.text}</div>
+            <TermLine key={i} text={e.text} className={tone[e.tone ?? 'dim']} />
           ),
         )}
         <div className="flex items-center">
           {!busy && <span className="mr-2 text-white">›</span>}
           <input ref={input} value={cmd} disabled={busy} onChange={(e) => setCmd(e.target.value)} onKeyDown={onKey}
             aria-label="Aura demo command" spellCheck={false} autoComplete="off"
-            className="w-0 flex-1 bg-transparent text-white caret-white outline-none placeholder:text-neutral-700"
+            className="w-0 flex-1 bg-transparent text-base text-white caret-white sm:text-[13px] outline-none placeholder:text-neutral-700"
             placeholder={busy ? '' : 'type /help'} />
         </div>
       </pre>
-      <div className="flex flex-wrap gap-2 border-t border-white/10 px-5 py-3">
+      <div className="flex flex-wrap gap-2 border-t border-white/10 px-4 py-3 sm:px-5">
         {chips.map((c) => (
           <button key={c} onClick={() => submit(c)} disabled={busy}
             className="rounded-full border border-white/15 px-3 py-1 font-mono text-xs text-neutral-300 transition-colors hover:border-white/40 hover:text-white disabled:opacity-40">
