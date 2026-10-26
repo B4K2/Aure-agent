@@ -202,7 +202,9 @@ function Demo() {
         <Reveal delay={0.3}>
           <p className="mt-8 max-w-md leading-relaxed text-neutral-400">
             Break the demo shop with <span className="font-mono text-sm text-white">node inject.js bad-deploy-checkout-500</span> and
-            watch Aura go from anomaly to approved rollback, with the reasoning shown at every step.
+            watch Aura go from anomaly to approved rollback, with the reasoning shown at every step. Then take the
+            keyboard: break the shop yourself with <span className="font-mono text-sm text-white">/inject</span>, watch it
+            on <span className="font-mono text-sm text-white">/state</span>, and approve or reject the fix.
           </p>
         </Reveal>
       </div>
