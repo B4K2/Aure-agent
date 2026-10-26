@@ -19,6 +19,13 @@ STATE_DIR.mkdir(exist_ok=True)
 VOID_URL = os.getenv("VOID_URL", "http://localhost:4000").rstrip("/")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgres://void:void@localhost:5433/void")
 DB_CONTAINER = os.getenv("VOID_DB_CONTAINER", "test-website-db-1")
+# Where the watched service runs: "docker" (local demo) or "kubernetes" (kubectl; see aura/runtime.py).
+RUNTIME = os.getenv("AURA_RUNTIME", "docker").lower()
+K8S_NAMESPACE = os.getenv("K8S_NAMESPACE", "default")
+K8S_CONTEXT = os.getenv("K8S_CONTEXT", "")  # empty = kubeconfig's current context (or in-cluster)
+K8S_APP_DEPLOYMENT = os.getenv("K8S_APP_DEPLOYMENT", "void-app")
+K8S_APP_SELECTOR = os.getenv("K8S_APP_SELECTOR", "app=void-app")
+K8S_DB_STATEFULSET = os.getenv("K8S_DB_STATEFULSET", "void-db")
 SERVICE = "void-app"  # the one service under watch; DB issues are attributed to it too
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.meta.ai/v1")
