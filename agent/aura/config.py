@@ -19,6 +19,14 @@ STATE_DIR.mkdir(exist_ok=True)
 VOID_URL = os.getenv("VOID_URL", "http://localhost:4000").rstrip("/")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgres://void:void@localhost:5433/void")
 DB_CONTAINER = os.getenv("VOID_DB_CONTAINER", "test-website-db-1")
+# Where the watched service runs: "docker" (local demo) or "kubernetes" (kubectl; see aura/runtime.py).
+RUNTIME = os.getenv("AURA_RUNTIME", "docker").lower()
+K8S_NAMESPACE = os.getenv("K8S_NAMESPACE", "default")
+K8S_CONTEXT = os.getenv("K8S_CONTEXT", "")  # empty = kubeconfig's current context (or in-cluster)
+# Empty = detected from the namespace on startup (aura/runtime.py discover(); `aura connect` shows the result).
+K8S_APP_DEPLOYMENT = os.getenv("K8S_APP_DEPLOYMENT", "")
+K8S_APP_SELECTOR = os.getenv("K8S_APP_SELECTOR", "")
+K8S_DB_STATEFULSET = os.getenv("K8S_DB_STATEFULSET", "")
 SERVICE = "void-app"  # the one service under watch; DB issues are attributed to it too
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.meta.ai/v1")
@@ -52,6 +60,7 @@ def _api_token() -> str:
 
 API_TOKEN = _api_token()
 API_PORT = int(os.getenv("AURA_API_PORT", "8700"))
+API_HOST = os.getenv("AURA_API_HOST", "127.0.0.1")  # 0.0.0.0 in a container
 
 POLL_SECONDS = float(os.getenv("AURA_POLL_SECONDS", "5"))
 DEBOUNCE_SECONDS = 12         # §12: let a burst settle before enrichment

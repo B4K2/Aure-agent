@@ -6,24 +6,14 @@ import time
 
 import httpx
 from .. import config, db
+from ..runtime import runtime
 from ..state import AuraState, audit
-
-RESTART_JS = (f"import('{config.PROBLEM_DIR / 'lib' / 'server.js'}')"
-              ".then(m => m.restart()).then(ok => process.exit(ok ? 0 : 1))")
 
 
 def _commands(action: dict) -> list[list[str]] | str:
-    t, target = action["type"], action.get("target", "")
-    restart = ["node", "-e", RESTART_JS]
-    if t == "rollback":
-        return [["git", "-C", str(config.WEBSITE_DIR), "revert", "--no-edit", target], restart]
-    if t == "restart_service":
-        return [restart]
-    if t == "start_db":
-        return [["docker", "start", config.DB_CONTAINER]]
-    if t == "terminate_db_sessions":
-        return f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = '{target}'"
-    return []
+    if action["type"] == "terminate_db_sessions":
+        return f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = '{action.get('target', '')}'"
+    return runtime.commands(action)
 
 
 def dry_run(action: dict) -> str:
@@ -32,11 +22,9 @@ def dry_run(action: dict) -> str:
         return f"psql> {cmds};"
     if not cmds:
         return f"(no command: '{action['type']}' is advisory; nothing will be executed)"
-    lines = [" ".join(c if c != RESTART_JS else "<restart website via problem/lib/server.js>" for c in cmd) for cmd in cmds]
+    lines = [runtime.show(cmd) for cmd in cmds]
     if action["type"] == "rollback":
-        lines.insert(0, "# commit to revert:\n" + subprocess.run(
-            ["git", "-C", str(config.WEBSITE_DIR), "show", "--stat", "--format=%h %s (%an, %cr)", action["target"]],
-            capture_output=True, text=True).stdout.strip())
+        lines.insert(0, runtime.rollback_preview(action))
     return "\n".join(lines)
 
 
@@ -53,7 +41,7 @@ def _run(action: dict) -> list[str]:
     for cmd in cmds:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
         logs.append(f"$ {' '.join(cmd[:4])}{' …' if len(cmd) > 4 else ''} → exit {r.returncode}\n{(r.stdout + r.stderr).strip()[-1500:]}")
-        if r.returncode != 0 and cmd[0] == "git":
+        if r.returncode != 0 and cmd[0] in ("git", "kubectl"):
             raise RuntimeError(logs[-1])
     return logs
 

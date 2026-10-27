@@ -20,6 +20,26 @@ node inject.js show <scenario>            # symptoms + expected fix. Don't show 
 Env overrides: `VOID_URL` (default `http://localhost:4000`), `DATABASE_URL`, `VOID_WEBSITE_DIR`,
 `VOID_DB_CONTAINER` (`test-website-db-1`), `VOID_APP_CONTAINER` (`test-website-app-1`).
 
+## On Kubernetes (minikube)
+
+```bash
+bash k8s/up.sh                            # minikube profile "aura", namespace void, test-website at HEAD
+set -a; source .state/k8s.env; set +a     # VOID_RUNTIME=kubernetes, VOID_URL, DATABASE_URL, AURA_RUNTIME...
+npm run traffic -- --users 20             # same commands as above, from this shell
+node inject.js bad-deploy-checkout-500
+bash k8s/up.sh down                       # delete the cluster
+```
+
+Postgres is a StatefulSet (`void-db`), the app a one-replica Deployment (`void-app`), both NodePorts
+published on localhost (`:30400` app, `:30433` db). A **deploy** builds `test-website` at HEAD into
+`void-app:<commit>` inside minikube and runs `kubectl set image`, with the commit as the change-cause,
+so `kubectl rollout history` matches git. **db-outage** scales `void-db` to 0. Start the Aura agent from
+the same shell so it picks up `AURA_RUNTIME=kubernetes` and watches the cluster.
+
+Kubernetes changes some scenarios: with the readiness probe, `bad-deploy-crash` stalls the rollout and
+the old pod keeps serving (nothing is rolled back); crashed containers are restarted by the kubelet;
+`memory-leak` ends in an OOMKill at the 1 Gi limit.
+
 ## Virtual users (`traffic/simulate.js`)
 
 Each virtual user is one browser session that does what the React app does:

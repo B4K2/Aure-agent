@@ -2,13 +2,13 @@
 keeps rolling baselines; emits Anomaly dicts. No LLM here (rule of thumb, §6)."""
 import re
 import statistics
-import subprocess
 import time
 import uuid
 from collections import defaultdict, deque
 
 import httpx
 from .. import config, db
+from ..runtime import runtime
 from ..state import Anomaly, now
 
 SIGMA = 4.0       # 5 s polling is noisy; 2σ fires on ordinary traffic jitter
@@ -56,7 +56,6 @@ class Observer:
         self.hist: dict[str, deque] = defaultdict(lambda: deque(maxlen=WINDOW))
         self.prev: dict | None = None
         self.prev_t = 0.0
-        self.log_pos = config.SERVER_LOG.stat().st_size if config.SERVER_LOG.exists() else 0
         self.recent_logs: deque[str] = deque(maxlen=400)  # unfiltered, for the Conversation Agent
         self.filtered_logs: deque[str] = deque(maxlen=200)
         self.last_signals: dict = {}
@@ -118,11 +117,7 @@ class Observer:
         return None
 
     def _db(self) -> dict:
-        info = {"container_running": None}
-        out = subprocess.run(["docker", "inspect", "-f", "{{.State.Running}}", config.DB_CONTAINER],
-                             capture_output=True, text=True)
-        if out.returncode == 0:
-            info["container_running"] = out.stdout.strip() == "true"
+        info = {"container_running": runtime.db_running()}
         try:
             with db.session() as c:  # long-lived: still works when every slot is taken
                 info["max_connections"] = int(c.execute("SHOW max_connections").fetchone()[0])
@@ -163,16 +158,7 @@ class Observer:
         return info
 
     def _logs(self) -> list[str]:
-        if not config.SERVER_LOG.exists():
-            return []
-        size = config.SERVER_LOG.stat().st_size
-        if size < self.log_pos:
-            self.log_pos = 0
-        with config.SERVER_LOG.open("r", errors="replace") as f:
-            f.seek(self.log_pos)
-            chunk = f.read(2_000_000)
-            self.log_pos = f.tell()
-        lines = chunk.splitlines()
+        lines = runtime.new_log_lines()
         self.recent_logs.extend(lines)
         kept = [l for l in lines if LOG_KEEP.search(l)]
         self.filtered_logs.extend(kept)
@@ -202,7 +188,7 @@ class Observer:
         if not health["up"]:
             found.append(_anomaly("infra_event", f"/api/health {health['status']}", "health", None, None, None))
         if db.get("container_running") is False:
-            found.append(_anomaly("infra_event", f"container {config.DB_CONTAINER} is not running", "db_container", 0, 1, None))
+            found.append(_anomaly("infra_event", f"{runtime.db_label} is not running", "db_container", 0, 1, None))
         elif db.get("reachable") is False:
             found.append(_anomaly("infra_event", f"Postgres unreachable: {db.get('error')}", "db_reachable", 0, 1, None))
         if db.get("max_connections") and db.get("total_sessions", 0) >= 0.9 * db["max_connections"]:

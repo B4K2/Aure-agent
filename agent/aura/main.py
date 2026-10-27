@@ -372,4 +372,4 @@ async def ws(sock: WebSocket):
 
 
 if __name__ == "__main__":
-    uvicorn.run(api, host="127.0.0.1", port=config.API_PORT, log_level="warning")
+    uvicorn.run(api, host=config.API_HOST, port=config.API_PORT, log_level="warning")

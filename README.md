@@ -100,6 +100,6 @@ Actions Aura can propose: `rollback`, `restart_service`, `terminate_db_sessions`
 - **Mobile app** — push notifications for new incidents and approve/reject from the phone,
   so on-call engineers can act without opening a laptop.
 - **Integrations** — Slack / Teams / email notifications and approvals.
-- **Kubernetes support** — operator plus `aura connect` auto-detection of services.
+- **Kubernetes support** — ~~kubectl runtime, in-cluster deploy, `aura connect` auto-detection~~ (done, `deploy/k8s/`); operator next.
 - **Multi-tenant** — auth, teams, audit log, production hardening.
 - **Smarter learning** — measured memory effect (faster, higher-confidence RCA on repeat incidents).

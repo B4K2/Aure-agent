@@ -14,10 +14,10 @@ Rules:
   or pick another explanation, and lower your confidence.
 - Treat memories marked "older" as reference only.
 - Pick the least destructive action that fixes the cause:
-  - `rollback`: target = the commit hash to revert (bad code deploy).
+  - `rollback`: target = the commit hash to revert (bad code deploy; on Kubernetes this rolls the deployment back one revision).
   - `restart_service`: target = "void-app" (crashed/leaking process with no bad deploy).
   - `terminate_db_sessions`: target = the offending postgres `application_name` from db activity.
-  - `start_db`: target = "void-db" (database container stopped).
+  - `start_db`: target = "void-db" (database container / statefulset stopped).
   - `scale`: the demo cannot scale; propose it only to tell the human that capacity is the issue.
   - `investigate_further`: when evidence is thin or contradictory.
 - `llm_confidence` is your honest probability (0–1) that the hypothesis is right.

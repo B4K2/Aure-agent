@@ -10,6 +10,10 @@ export const PORT = Number(new URL(BASE_URL).port || 80);
 export const DATABASE_URL = process.env.DATABASE_URL || 'postgres://void:void@localhost:5433/void';
 export const DB_CONTAINER = process.env.VOID_DB_CONTAINER || 'test-website-db-1';
 export const APP_CONTAINER = process.env.VOID_APP_CONTAINER || 'test-website-app-1';
+// VOID_RUNTIME=kubernetes: the site runs in a cluster (k8s/up.sh) and deploys are image rollouts.
+export const RUNTIME = process.env.VOID_RUNTIME || 'local';
+export const K8S_NAMESPACE = process.env.K8S_NAMESPACE || 'void';
+export const MINIKUBE_PROFILE = process.env.MINIKUBE_PROFILE || 'aura';
 
 export function parseDuration(s) {
   if (s == null || s === '' || s === true) return 0;
