@@ -25,3 +25,5 @@ test-website/
 .DS_Store
 .idea/
 .vscode/
+.riftguard/local/
+.claude/settings.local.json
