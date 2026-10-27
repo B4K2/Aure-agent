@@ -30,3 +30,10 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+
+## Deploy (Vercel)
+
+Import the repo in Vercel with **Root Directory = `web`**; `vercel.json` sets the Vite build and
+rewrites every path (e.g. `/dashboard`) to `index.html`. The hosted site is the landing page and its
+demo terminal. `/dashboard` there has no agent behind it: `/ws`, `/incidents` and `/memory` are
+same-origin, so a live dashboard needs the agent served from the same host (`deploy/k8s` does this).
