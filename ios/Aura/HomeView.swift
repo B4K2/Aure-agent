@@ -39,13 +39,14 @@ struct HomeView: View {
                         }
                     }
                 }
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .principal) {
                     HStack(spacing: 8) {
-                        LogoMark(size: 20)
-                        Text("Aura").font(.headline)
+                        LogoMark(size: 22)
+                        Text("Aura").font(.system(size: 19, weight: .medium)).tracking(-0.3)
                     }
-                    .padding(.horizontal, 6)
+                    .fixedSize()
                 }
+                .sharedBackgroundVisibility(.hidden)
             }
         }
     }
