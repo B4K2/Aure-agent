@@ -5,12 +5,13 @@ struct IncidentView: View {
     @Environment(AuraModel.self) var model
     @State var rejecting = false
     @State var reason = ""
+    @State var chatting = false
 
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
                 ScrollView {
-                    if let s = model.scenario {
+                    if model.scenario != nil {
                         VStack(spacing: 14) {
                             header(s)
                             ForEach(model.shown) { e in
@@ -48,11 +49,17 @@ struct IncidentView: View {
             .toolbar {
                 if model.scenario != nil {
                     ToolbarItem(placement: .topBarTrailing) {
+                        Button("Ask about this incident", systemImage: "bubble.left.and.text.bubble.right") { chatting = true }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button("Close", systemImage: "xmark") { model.dismiss() }
                     }
                 }
             }
             .safeAreaInset(edge: .bottom) { actionBar }
+            .sheet(isPresented: $chatting) {
+                ChatView(incident: model.isLive ? model.scenario?.id : nil, title: "Ask about this incident")
+            }
             .alert("Why reject it?", isPresented: $rejecting) {
                 TextField("Reason (saved to memory)", text: $reason)
                 Button("Reject", role: .destructive) { model.reject(reason: reason); reason = "" }

@@ -102,8 +102,17 @@ final class AuraModel {
     enum Mode: String { case demo, live }
     enum Link: Equatable { case off, connecting, live(String), failed(String) }
 
-    struct Remembered: Identifiable {
+    struct Remembered: Identifiable, Hashable {
         let id: String, title: String, detail: String, outcome: String, when: String
+        var service = "", resolvedBy = "", similarity: Double? = nil
+        var fields: [String: String] = [:]
+    }
+
+    struct ChatMsg: Identifiable, Equatable {
+        enum Role { case me, aura, tool }
+        let id = UUID()
+        let role: Role
+        let text: String
     }
 
     var mode: Mode = Mode(rawValue: UserDefaults.standard.string(forKey: "aura.mode") ?? "") ?? .demo
@@ -119,6 +128,10 @@ final class AuraModel {
     var history: [Metrics] = Array(repeating: .base, count: 40)
     var records: [IncidentRecord] = []
     var remembered: [Remembered] = []
+    var memoryError: String?
+    /// Chat threads keyed by incident id; "" is the general thread.
+    var threads: [String: [ChatMsg]] = [:]
+    var waiting: Set<String> = []
 
     private var target = Metrics.base
     private var ticking = false
@@ -227,6 +240,21 @@ final class AuraModel {
         }
     }
 
+    func ask(_ text: String, incident: String?) {
+        let key = incident ?? ""
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        threads[key, default: []].append(ChatMsg(role: .me, text: t))
+        guard mode == .live, case .live = link else {
+            threads[key, default: []].append(ChatMsg(role: .aura, text: "I'm in demo mode. Connect to your agent (tap Demo on Overview) and I'll answer with real data."))
+            return
+        }
+        waiting.insert(key)
+        var msg: [String: Any] = ["type": "chat", "text": t]
+        if let incident { msg["incident_id"] = incident }
+        send(msg)
+    }
+
     /// Same prompt the CLI's /investigate sends: Aura digs in with its tools and proposes an executable fix.
     func investigate() {
         guard mode == .live, let s = scenario else { return }
@@ -330,16 +358,29 @@ final class AuraModel {
             if let inc = ev["incident"] as? [String: Any] { apply(inc) }
             if ev["type"] as? String == "closed" { Task { await loadMemory() } }
         case "thinking":
-            thinking = true
+            let key = ev["incident_id"] as? String ?? ""
+            if !key.isEmpty, key == scenario?.id, !waiting.contains(key) { thinking = true }
         case "tool":
-            guard ev["incident_id"] as? String == scenario?.id, let name = ev["name"] as? String else { return }
-            withAnimation(.spring) { shown.append(Evidence(kind: .evidence, label: "tool", text: name.replacingOccurrences(of: "_", with: " "))) }
+            guard let name = ev["name"] as? String else { return }
+            let key = ev["incident_id"] as? String ?? ""
+            let pretty = name.replacingOccurrences(of: "_", with: " ")
+            if waiting.contains(key) { threads[key, default: []].append(ChatMsg(role: .tool, text: pretty)) }
+            if thinking, key == scenario?.id {
+                withAnimation(.spring) { shown.append(Evidence(kind: .evidence, label: "tool", text: pretty)) }
+            }
         case "answer":
-            thinking = false
-            guard let text = ev["text"] as? String, ev["incident_id"] as? String == scenario?.id else { return }
-            withAnimation(.spring) { shown.append(Evidence(kind: .hypothesis, label: "Aura", text: text)) }
+            let key = ev["incident_id"] as? String ?? ""
+            let text = ev["text"] as? String ?? ""
+            if waiting.contains(key) {
+                waiting.remove(key)
+                threads[key, default: []].append(ChatMsg(role: .aura, text: text))
+            } else if thinking, key == scenario?.id {
+                thinking = false
+                withAnimation(.spring) { shown.append(Evidence(kind: .hypothesis, label: "Aura", text: text)) }
+            }
         case "error":
             thinking = false
+            waiting.removeAll()
             lastError = ev["message"] as? String
             if phase == .fixing { phase = .proposed }
         default: break
@@ -403,21 +444,66 @@ final class AuraModel {
     }
 
     func loadMemory() async {
-        guard mode == .live, var comps = URLComponents(string: serverURL) else { return }
-        comps.path = "/memory/incidents"
-        guard let url = comps.url else { return }
+        guard let rows = await getJSON("/memory/incidents") as? [[String: Any]] else { return }
+        remembered = rows.prefix(200).map(remembered(from:))
+    }
+
+    /// Free-text search over remembered incidents and runbooks (agent's /memory/search).
+    func searchMemory(_ q: String) async -> [Remembered] {
+        let t = q.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty, let res = await getJSON("/memory/search", query: [URLQueryItem(name: "q", value: t)]) as? [String: Any]
+        else { return [] }
+        let inc = (res["incidents"] as? [[String: Any]] ?? []).map(remembered(from:))
+        let books = (res["runbooks"] as? [[String: Any]] ?? []).map { r -> Remembered in
+            var m = remembered(from: r)
+            m = Remembered(id: "rb-" + m.id, title: (r["title"] as? String) ?? (r["source"] as? String) ?? "Runbook",
+                           detail: (r["text"] as? String) ?? m.detail, outcome: "runbook", when: "",
+                           similarity: m.similarity, fields: m.fields)
+            return m
+        }
+        return inc + books
+    }
+
+    private func remembered(from r: [String: Any]) -> Remembered {
+        func str(_ v: Any) -> String {
+            if let s = v as? String { return s }
+            if let n = v as? NSNumber { return n.stringValue }
+            if let d = try? JSONSerialization.data(withJSONObject: v, options: [.prettyPrinted]) { return String(decoding: d, as: UTF8.self) }
+            return "\(v)"
+        }
+        let pretty = { (s: String?) in s?.replacingOccurrences(of: "_", with: " ") }
+        return Remembered(
+            id: r["incident_id"] as? String ?? r["id"] as? String ?? UUID().uuidString,
+            title: pretty(r["root_cause_type"] as? String)?.capitalized ?? (r["incident_id"] as? String ?? "Incident"),
+            detail: (r["text"] as? String) ?? (r["hypothesis"] as? String) ?? "",
+            outcome: r["outcome"] as? String ?? "",
+            when: String((r["timestamp"] as? String ?? "").prefix(16)).replacingOccurrences(of: "T", with: " "),
+            service: r["service"] as? String ?? "",
+            resolvedBy: pretty(r["resolved_by"] as? String) ?? "",
+            similarity: (r["similarity"] as? NSNumber)?.doubleValue,
+            fields: r.mapValues(str))
+    }
+
+    private func getJSON(_ path: String, query: [URLQueryItem] = []) async -> Any? {
+        guard mode == .live, var comps = URLComponents(string: serverURL) else { return nil }
+        comps.path = path
+        if !query.isEmpty { comps.queryItems = query }
+        guard let url = comps.url else { return nil }
         var req = URLRequest(url: url)
         req.setValue(token, forHTTPHeaderField: "x-aura-token")
-        guard let (data, resp) = try? await URLSession.shared.data(for: req),
-              (resp as? HTTPURLResponse)?.statusCode == 200,
-              let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return }
-        remembered = rows.prefix(100).map { r in
-            Remembered(id: r["incident_id"] as? String ?? UUID().uuidString,
-                       title: (r["root_cause_type"] as? String)?.replacingOccurrences(of: "_", with: " ").capitalized
-                            ?? (r["incident_id"] as? String ?? "Incident"),
-                       detail: (r["hypothesis"] as? String) ?? (r["summary"] as? String) ?? "",
-                       outcome: r["outcome"] as? String ?? "",
-                       when: String((r["timestamp"] as? String ?? "").prefix(16)).replacingOccurrences(of: "T", with: " "))
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            let body = try? JSONSerialization.jsonObject(with: data)
+            guard code == 200 else {
+                memoryError = (body as? [String: Any])?["detail"] as? String ?? "HTTP \(code)"
+                return nil
+            }
+            memoryError = nil
+            return body
+        } catch {
+            memoryError = "Can't reach the agent"
+            return nil
         }
     }
 }
