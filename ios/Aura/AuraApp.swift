@@ -9,7 +9,7 @@ struct AuraApp: App {
             RootView()
                 .environment(model)
                 .preferredColorScheme(.dark)
-                .task { await model.startTicking() }
+                .task { await model.start() }
         }
     }
 }

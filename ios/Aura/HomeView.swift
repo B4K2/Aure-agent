@@ -4,6 +4,15 @@ import Charts
 struct HomeView: View {
     @Environment(AuraModel.self) var model
     var openIncident: () -> Void
+    @State var showConnect = false
+
+    var dotColor: Color {
+        switch model.link {
+        case .live: .white
+        case .connecting: .white.opacity(0.5)
+        default: .white.opacity(model.isLive ? 0.2 : 0.5)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -12,7 +21,7 @@ struct HomeView: View {
                     hero
                     StatusCard(openIncident: openIncident)
                     metrics
-                    breakSomething
+                    if !model.isLive { breakSomething }
                     pipeline
                 }
                 .padding(.horizontal, 18)
@@ -20,7 +29,16 @@ struct HomeView: View {
             }
             .scrollIndicators(.hidden)
             .background(AppBackground())
+            .sheet(isPresented: $showConnect) { ConnectView() }
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showConnect = true } label: {
+                        HStack(spacing: 6) {
+                            Circle().fill(dotColor).frame(width: 7, height: 7)
+                            Text(model.isLive ? "Live" : "Demo").font(.subheadline.weight(.medium))
+                        }
+                    }
+                }
                 ToolbarItem(placement: .topBarLeading) {
                     HStack(spacing: 8) {
                         LogoMark(size: 20)
@@ -45,7 +63,7 @@ struct HomeView: View {
 
     var metrics: some View {
         VStack(spacing: 12) {
-            Eyebrow(text: "Live · demo shop")
+            Eyebrow(text: model.isLive ? "Live · your service" : "Demo shop")
             let h = model.history
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                 MetricTile(name: "Traffic", value: "\(Int(model.now.rps)) rps", values: h.map(\.rps), alert: model.now.rps > 200)
@@ -121,9 +139,14 @@ struct StatusCard: View {
     @Environment(AuraModel.self) var model
     var openIncident: () -> Void
 
+    var watching: String {
+        if case .live(let w) = model.link { return "Watching \(w)" }
+        return "Not connected"
+    }
+
     var body: some View {
         let (title, sub, color, icon): (String, String, Color, String) = switch model.phase {
-        case .healthy: ("All systems normal", "Aura is watching void-app", Theme.ok, "checkmark.seal.fill")
+        case .healthy: ("All systems normal", model.isLive ? watching : "Demo mode · scripted on this phone", Theme.ok, "checkmark.seal.fill")
         case .investigating: ("Investigating", model.scenario?.summary ?? "", Theme.warn, "magnifyingglass")
         case .proposed: ("Fix ready for approval", model.scenario?.action ?? "", Theme.warn, "hand.raised.fill")
         case .fixing: ("Applying fix", model.scenario?.action ?? "", Theme.warn, "gearshape.2.fill")
@@ -146,7 +169,7 @@ struct StatusCard: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.tint(color.opacity(model.phase == .healthy ? 0.08 : 0.22)).interactive(), in: .rect(cornerRadius: 26))
+        .glassEffect(.regular.tint(.white.opacity(model.phase == .healthy ? 0.04 : 0.14)).interactive(), in: .rect(cornerRadius: 26))
     }
 }
 

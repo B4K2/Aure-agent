@@ -6,9 +6,10 @@ enum Theme {
 
     static let dim = Color.white.opacity(0.6)
     static let faint = Color.white.opacity(0.4)
-    static let ok = Color(red: 0.42, green: 0.86, blue: 0.58)
-    static let bad = Color(red: 1.0, green: 0.42, blue: 0.42)
-    static let warn = Color(red: 1.0, green: 0.74, blue: 0.35)
+    // Black and white only: state is carried by icons and weight, not hue.
+    static let ok = Color.white
+    static let bad = Color.white
+    static let warn = Color.white.opacity(0.85)
 }
 
 extension Font {
@@ -16,21 +17,22 @@ extension Font {
     static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight, design: .monospaced) }
 }
 
-/// Static dark mesh behind every screen. Liquid Glass needs something to refract;
-/// on flat black it just reads as grey. Static on purpose: zero per-frame cost.
+/// Black canvas with soft white light leaks. Liquid Glass needs something to refract;
+/// on flat black it reads as dull grey. Static on purpose: zero per-frame cost.
+/// `glow` brightens the light a little (used while an incident is open).
 struct AppBackground: View {
-    var tint: Color = .indigo
+    var glow: Double = 1
 
     var body: some View {
-        MeshGradient(
-            width: 3, height: 3,
-            points: [[0, 0], [0.5, 0], [1, 0],
-                     [0, 0.5], [0.6, 0.4], [1, 0.5],
-                     [0, 1], [0.5, 1], [1, 1]],
-            colors: [.black, tint.opacity(0.55), .black,
-                     Color(red: 0.05, green: 0.1, blue: 0.25), .black, Color(red: 0.2, green: 0.05, blue: 0.3),
-                     .black, Color(red: 0.0, green: 0.2, blue: 0.25), .black]
-        )
+        ZStack {
+            Color.black
+            RadialGradient(colors: [.white.opacity(0.16 * glow), .clear], center: .init(x: 0.85, y: 0.05),
+                           startRadius: 0, endRadius: 420)
+            RadialGradient(colors: [.white.opacity(0.09 * glow), .clear], center: .init(x: 0.05, y: 0.55),
+                           startRadius: 0, endRadius: 360)
+            RadialGradient(colors: [.white.opacity(0.07 * glow), .clear], center: .init(x: 0.9, y: 0.95),
+                           startRadius: 0, endRadius: 380)
+        }
         .ignoresSafeArea()
     }
 }

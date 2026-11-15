@@ -43,6 +43,8 @@ struct AboutView: View {
                                     .frame(maxWidth: .infinity).padding(.vertical, 6)
                             }
                             .buttonStyle(.glassProminent)
+                            .tint(.white)
+                            .foregroundStyle(.black)
                             Link(destination: Theme.docs) {
                                 Label("Docs", systemImage: "book").frame(maxWidth: .infinity).padding(.vertical, 6)
                             }
@@ -54,7 +56,7 @@ struct AboutView: View {
                 }
                 .padding(.horizontal, 18).padding(.bottom, 40)
             }
-            .background(AppBackground(tint: .purple))
+            .background(AppBackground())
             .navigationTitle("About")
         }
     }

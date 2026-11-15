@@ -43,7 +43,7 @@ struct IncidentView: View {
                     withAnimation { proxy.scrollTo("proposal", anchor: .bottom) }
                 }
             }
-            .background(AppBackground(tint: model.phase == .healthy || model.phase == .resolved ? .indigo : .red))
+            .background(AppBackground(glow: model.phase == .healthy || model.phase == .resolved ? 1 : 1.6))
             .navigationTitle("Incident")
             .toolbar {
                 if model.scenario != nil {
@@ -58,6 +58,9 @@ struct IncidentView: View {
                 Button("Reject", role: .destructive) { model.reject(reason: reason); reason = "" }
                 Button("Cancel", role: .cancel) {}
             }
+            .alert("Agent said no", isPresented: Binding(get: { model.lastError != nil }, set: { if !$0 { model.lastError = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: { Text(model.lastError ?? "") }
             .sensoryFeedback(.success, trigger: model.records.count)
             .sensoryFeedback(.warning, trigger: model.phase == .proposed)
         }
@@ -66,7 +69,7 @@ struct IncidentView: View {
     func header(_ s: Scenario) -> some View {
         HStack(spacing: 12) {
             Image(systemName: s.icon).font(.title3).frame(width: 44, height: 44)
-                .glassEffect(.regular.tint(.red.opacity(0.25)), in: .circle)
+                .glassEffect(.regular, in: .circle)
             VStack(alignment: .leading, spacing: 2) {
                 Text(s.title).font(.title3.weight(.semibold))
                 Text(s.summary).font(.footnote).foregroundStyle(Theme.dim)
@@ -80,6 +83,10 @@ struct IncidentView: View {
         VStack(spacing: 22) {
             ContentUnavailableView("No active incident", systemImage: "checkmark.seal",
                                    description: Text("Break the demo shop and watch Aura go from anomaly to fix."))
+            if model.isLive {
+                Text("Aura is watching. Incidents appear here the moment it opens one.")
+                    .font(.footnote).foregroundStyle(Theme.dim).multilineTextAlignment(.center).padding(.horizontal, 40)
+            } else {
             GlassEffectContainer(spacing: 10) {
                 VStack(spacing: 10) {
                     ForEach(SCENARIOS) { s in
@@ -90,6 +97,7 @@ struct IncidentView: View {
                         .buttonStyle(.glass)
                     }
                 }
+            }
             }
         }
         .padding(.top, 60)
@@ -108,7 +116,8 @@ struct IncidentView: View {
                             .frame(maxWidth: .infinity).padding(.vertical, 6)
                     }
                     .buttonStyle(.glassProminent)
-                    .tint(Theme.ok.opacity(0.8))
+                    .tint(.white)
+                    .foregroundStyle(.black)
                 }
             }
             .padding(.horizontal, 18).padding(.bottom, 8)
@@ -140,7 +149,7 @@ struct EvidenceCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(e.kind == .anomaly ? Theme.bad.opacity(0.18) : .clear), in: .rect(cornerRadius: 22))
+        .glassEffect(.regular.tint(.white.opacity(e.kind == .evidence ? 0 : 0.08)), in: .rect(cornerRadius: 22))
     }
 
     var icon: String {
@@ -174,6 +183,6 @@ struct ProposalCard: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint((phase == .resolved ? Theme.ok : Color.white).opacity(0.12)), in: .rect(cornerRadius: 24))
+        .glassEffect(.regular.tint(.white.opacity(0.12)), in: .rect(cornerRadius: 24))
     }
 }
