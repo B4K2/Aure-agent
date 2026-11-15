@@ -8,8 +8,8 @@ statement, CTA and footer.
 ## Run it
 
 1. `git pull && git checkout ios`
-2. Open `ios/Aura.xcodeproj` in **Xcode 16+** (macOS 14.5+).
-3. Pick an iPhone simulator (iOS 17+) and press **⌘R**.
+2. Open `ios/Aura.xcodeproj` in **Xcode 26+** (Xcode 26+ for Liquid Glass).
+3. Pick an iPhone simulator (iOS 26) and press **⌘R**.
 
 To run on a real iPhone: select the **Aura** target → *Signing & Capabilities* → pick your team
 (a free Apple ID works), and change the bundle id `com.aura.app` if Xcode says it is taken.

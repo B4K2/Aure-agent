@@ -1,82 +1,45 @@
 import SwiftUI
 
-/// Mirrors the web page's look: black canvas, white type, neutral greys,
-/// a light sans for headlines and an italic serif for the accent words.
 enum Theme {
     static let repo = URL(string: "https://github.com/B4K2/Aure-agent")!
-    static let dashboard = URL(string: "https://github.com/B4K2/Aure-agent#readme")!
+    static let docs = URL(string: "https://github.com/B4K2/Aure-agent#readme")!
 
-    static let neutral300 = Color(white: 0.83)
-    static let neutral400 = Color(white: 0.64)
-    static let neutral500 = Color(white: 0.45)
-    static let neutral600 = Color(white: 0.32)
-    static let neutral700 = Color(white: 0.25)
-    static let hairline = Color.white.opacity(0.1)
-    static let card = Color(white: 0.04)
+    static let dim = Color.white.opacity(0.6)
+    static let faint = Color.white.opacity(0.4)
+    static let ok = Color(red: 0.42, green: 0.86, blue: 0.58)
+    static let bad = Color(red: 1.0, green: 0.42, blue: 0.42)
+    static let warn = Color(red: 1.0, green: 0.74, blue: 0.35)
 }
 
 extension Font {
-    static func display(_ size: CGFloat) -> Font { .system(size: size, weight: .light) }
     static func serifItalic(_ size: CGFloat) -> Font { .system(size: size, weight: .regular, design: .serif).italic() }
-    static func mono(_ size: CGFloat) -> Font { .system(size: size, design: .monospaced) }
+    static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight, design: .monospaced) }
 }
 
-/// Fades and lifts content in the first time it appears, like the web `Reveal`.
-struct Reveal: ViewModifier {
-    var delay: Double = 0
-    @State var shown = false
-    func body(content: Content) -> some View {
-        content
-            .opacity(shown ? 1 : 0)
-            .offset(y: shown ? 0 : 20)
-            .onAppear {
-                withAnimation(.easeOut(duration: 0.8).delay(delay)) { shown = true }
-            }
-    }
-}
-
-extension View {
-    func reveal(_ delay: Double = 0) -> some View { modifier(Reveal(delay: delay)) }
-}
-
-/// "Plain words" + "serif italic words", the two-tone headline used across the page.
-struct TwoToneTitle: View {
-    let plain: String
-    let serif: String
-    var size: CGFloat = 40
-    var alignment: TextAlignment = .leading
+/// Static dark mesh behind every screen. Liquid Glass needs something to refract;
+/// on flat black it just reads as grey. Static on purpose: zero per-frame cost.
+struct AppBackground: View {
+    var tint: Color = .indigo
 
     var body: some View {
-        (Text(plain + " ").font(.display(size)) + Text(serif).font(.serifItalic(size)))
-            .tracking(-size * 0.03)
-            .multilineTextAlignment(alignment)
-            .foregroundStyle(.white)
-    }
-}
-
-/// Faint film grain over everything, like the `.grain` overlay on the web.
-struct Grain: View {
-    var body: some View {
-        Canvas { ctx, size in
-            var rng = SeededRandom(seed: 7)
-            let count = Int(size.width * size.height / 90)
-            for _ in 0..<count {
-                let x = rng.next() * size.width, y = rng.next() * size.height
-                ctx.fill(Path(CGRect(x: x, y: y, width: 1, height: 1)),
-                         with: .color(.white.opacity(rng.next() * 0.5)))
-            }
-        }
-        .opacity(0.08)
-        .allowsHitTesting(false)
+        MeshGradient(
+            width: 3, height: 3,
+            points: [[0, 0], [0.5, 0], [1, 0],
+                     [0, 0.5], [0.6, 0.4], [1, 0.5],
+                     [0, 1], [0.5, 1], [1, 1]],
+            colors: [.black, tint.opacity(0.55), .black,
+                     Color(red: 0.05, green: 0.1, blue: 0.25), .black, Color(red: 0.2, green: 0.05, blue: 0.3),
+                     .black, Color(red: 0.0, green: 0.2, blue: 0.25), .black]
+        )
         .ignoresSafeArea()
     }
 }
 
-struct SeededRandom {
-    private var state: UInt64
-    init(seed: UInt64) { state = seed }
-    mutating func next() -> Double {
-        state = state &* 6364136223846793005 &+ 1442695040888963407
-        return Double(state >> 33) / Double(UInt64(1) << 31)
+/// Section label, monospaced and tracked out like the web eyebrows.
+struct Eyebrow: View {
+    let text: String
+    var body: some View {
+        Text(text.uppercased()).font(.mono(11, .medium)).tracking(2).foregroundStyle(Theme.faint)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
