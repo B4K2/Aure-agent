@@ -111,9 +111,21 @@ struct IncidentView: View {
                         Label("Reject", systemImage: "xmark").frame(maxWidth: .infinity).padding(.vertical, 6)
                     }
                     .buttonStyle(.glass)
-                    Button { model.approve() } label: {
-                        Label("Approve", systemImage: "checkmark").fontWeight(.semibold)
+                    if model.scenario?.advisory == true {
+                        Button { model.investigate() } label: {
+                            HStack(spacing: 8) {
+                                if model.thinking { ProgressView().controlSize(.small).tint(.black) }
+                                else { Image(systemName: "sparkle.magnifyingglass") }
+                                Text(model.thinking ? "Investigating…" : "Investigate").fontWeight(.semibold)
+                            }
                             .frame(maxWidth: .infinity).padding(.vertical, 6)
+                        }
+                        .disabled(model.thinking)
+                    } else {
+                        Button { model.approve() } label: {
+                            Label("Approve", systemImage: "checkmark").fontWeight(.semibold)
+                                .frame(maxWidth: .infinity).padding(.vertical, 6)
+                        }
                     }
                     .buttonStyle(.glassProminent)
                     .tint(.white)
@@ -178,7 +190,8 @@ struct ProposalCard: View {
             if phase == .resolved {
                 Text(scenario.resolved).font(.subheadline).foregroundStyle(Theme.ok)
             } else if phase == .proposed {
-                Text("Nothing runs until you approve.").font(.footnote).foregroundStyle(Theme.dim)
+                Text(scenario.advisory ? "Advice only. Tap Investigate so Aura can find a concrete fix you can approve."
+                                       : "Nothing runs until you approve.").font(.footnote).foregroundStyle(Theme.dim)
             }
         }
         .padding(18)

@@ -23,6 +23,8 @@ struct Scenario: Identifiable {
     let confidence: Double
     let action: String
     let resolved: String
+    /// investigate_further / scale: the agent won't execute these, only advise.
+    var advisory: Bool = false
 }
 
 struct IncidentRecord: Identifiable {
@@ -109,6 +111,7 @@ final class AuraModel {
     var token = Keychain.read("aura.token") ?? ""
     var link: Link = .off
     var lastError: String?
+    var thinking = false
 
     var phase: Phase = .healthy
     var scenario: Scenario?
@@ -224,6 +227,16 @@ final class AuraModel {
         }
     }
 
+    /// Same prompt the CLI's /investigate sends: Aura digs in with its tools and proposes an executable fix.
+    func investigate() {
+        guard mode == .live, let s = scenario else { return }
+        thinking = true
+        send(["type": "chat", "incident_id": s.id, "text":
+              "Investigate this incident with your tools (current signals, read-only DB queries such as " +
+              "pg_stat_activity grouped by application_name, logs, recent diffs). Find the concrete cause, then call " +
+              "propose_execution with an executable fix and tell me why."])
+    }
+
     func dismiss() { withAnimation(.spring) { resetIncident() } }
 
     // MARK: live
@@ -316,7 +329,17 @@ final class AuraModel {
         case "awaiting_approval", "action_changed", "closed", "incident":
             if let inc = ev["incident"] as? [String: Any] { apply(inc) }
             if ev["type"] as? String == "closed" { Task { await loadMemory() } }
+        case "thinking":
+            thinking = true
+        case "tool":
+            guard ev["incident_id"] as? String == scenario?.id, let name = ev["name"] as? String else { return }
+            withAnimation(.spring) { shown.append(Evidence(kind: .evidence, label: "tool", text: name.replacingOccurrences(of: "_", with: " "))) }
+        case "answer":
+            thinking = false
+            guard let text = ev["text"] as? String, ev["incident_id"] as? String == scenario?.id else { return }
+            withAnimation(.spring) { shown.append(Evidence(kind: .hypothesis, label: "Aura", text: text)) }
         case "error":
+            thinking = false
             lastError = ev["message"] as? String
             if phase == .fixing { phase = .proposed }
         default: break
@@ -349,10 +372,11 @@ final class AuraModel {
         let s = Scenario(id: iid, title: iid, icon: "waveform.path.ecg",
                          summary: (rca["root_cause_type"] as? String)?.replacingOccurrences(of: "_", with: " ") ?? status,
                          target: .base, evidence: ev, confidence: (rca["calibrated_confidence"] as? NSNumber)?.doubleValue ?? 0,
-                         action: actionText.isEmpty ? "Investigating" : actionText, resolved: resolvedText)
+                         action: actionText.isEmpty ? "Investigating" : actionText, resolved: resolvedText,
+                         advisory: ["investigate_further", "scale"].contains(action["type"] as? String ?? ""))
         withAnimation(.spring) {
             scenario = s
-            if !ev.isEmpty { shown = ev }
+            if !ev.isEmpty { shown = ev + shown.filter { $0.label == "Aura" || $0.label == "tool" } }
             switch status {
             case "awaiting_approval": phase = .proposed
             case "executing", "closing": phase = .fixing
