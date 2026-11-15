@@ -9,68 +9,81 @@ struct IncidentView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    if model.scenario != nil {
-                        VStack(spacing: 14) {
-                            header(s)
-                            ForEach(model.shown) { e in
-                                EvidenceCard(e: e, confidence: e.kind == .hypothesis ? s.confidence : nil)
-                                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                                    .id(e.id)
-                            }
-                            if model.phase == .investigating {
-                                HStack(spacing: 10) {
-                                    LogoMark(size: 16, lapSeconds: 0.9)
-                                    Text("Aura is investigating…").font(.footnote).foregroundStyle(Theme.dim)
-                                }
-                                .padding(.top, 6)
-                            }
-                            if model.phase != .investigating {
-                                ProposalCard(scenario: s, phase: model.phase).id("proposal")
-                            }
-                        }
-                        .padding(.horizontal, 18)
-                        .padding(.bottom, 120)
-                    } else {
-                        empty
-                    }
+            scroller
+                .background(AppBackground(glow: model.phase == .healthy || model.phase == .resolved ? 1 : 1.6))
+                .navigationTitle("Incident")
+                .toolbar { toolbarItems }
+                .safeAreaInset(edge: .bottom) { actionBar }
+                .sheet(isPresented: $chatting) {
+                    ChatView(incident: model.isLive ? model.scenario?.id : nil, title: "Ask about this incident")
                 }
-                .scrollIndicators(.hidden)
-                .onChange(of: model.shown.count) {
-                    if let last = model.shown.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
+                .alert("Why reject it?", isPresented: $rejecting) {
+                    TextField("Reason (saved to memory)", text: $reason)
+                    Button("Reject", role: .destructive) { model.reject(reason: reason); reason = "" }
+                    Button("Cancel", role: .cancel) {}
                 }
-                .onChange(of: model.phase) {
-                    withAnimation { proxy.scrollTo("proposal", anchor: .bottom) }
-                }
-            }
-            .background(AppBackground(glow: model.phase == .healthy || model.phase == .resolved ? 1 : 1.6))
-            .navigationTitle("Incident")
-            .toolbar {
-                if model.scenario != nil {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Ask about this incident", systemImage: "bubble.left.and.text.bubble.right") { chatting = true }
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Close", systemImage: "xmark") { model.dismiss() }
-                    }
-                }
-            }
-            .safeAreaInset(edge: .bottom) { actionBar }
-            .sheet(isPresented: $chatting) {
-                ChatView(incident: model.isLive ? model.scenario?.id : nil, title: "Ask about this incident")
-            }
-            .alert("Why reject it?", isPresented: $rejecting) {
-                TextField("Reason (saved to memory)", text: $reason)
-                Button("Reject", role: .destructive) { model.reject(reason: reason); reason = "" }
-                Button("Cancel", role: .cancel) {}
-            }
-            .alert("Agent said no", isPresented: Binding(get: { model.lastError != nil }, set: { if !$0 { model.lastError = nil } })) {
-                Button("OK", role: .cancel) {}
-            } message: { Text(model.lastError ?? "") }
-            .sensoryFeedback(.success, trigger: model.records.count)
-            .sensoryFeedback(.warning, trigger: model.phase == .proposed)
+                .alert("Agent said no", isPresented: errorShown) {
+                    Button("OK", role: .cancel) {}
+                } message: { Text(model.lastError ?? "") }
+                .sensoryFeedback(.success, trigger: model.records.count)
+                .sensoryFeedback(.warning, trigger: model.phase == .proposed)
         }
+    }
+
+    var errorShown: Binding<Bool> {
+        Binding(get: { model.lastError != nil }, set: { if !$0 { model.lastError = nil } })
+    }
+
+    @ToolbarContentBuilder var toolbarItems: some ToolbarContent {
+        if model.scenario != nil {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Ask about this incident", systemImage: "bubble.left.and.text.bubble.right") { chatting = true }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Close", systemImage: "xmark") { model.dismiss() }
+            }
+        }
+    }
+
+    var scroller: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                if let s = model.scenario {
+                    timeline(s)
+                } else {
+                    empty
+                }
+            }
+            .scrollIndicators(.hidden)
+            .onChange(of: model.shown.count) {
+                if let last = model.shown.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
+            }
+            .onChange(of: model.phase) {
+                withAnimation { proxy.scrollTo("proposal", anchor: .bottom) }
+            }
+        }
+    }
+
+    func timeline(_ s: Scenario) -> some View {
+        VStack(spacing: 14) {
+            header(s)
+            ForEach(model.shown) { e in
+                EvidenceCard(e: e, confidence: e.kind == .hypothesis ? s.confidence : nil)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .id(e.id)
+            }
+            if model.phase == .investigating {
+                HStack(spacing: 10) {
+                    LogoMark(size: 16, lapSeconds: 0.9)
+                    Text("Aura is investigating…").font(.footnote).foregroundStyle(Theme.dim)
+                }
+                .padding(.top, 6)
+            } else {
+                ProposalCard(scenario: s, phase: model.phase).id("proposal")
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.bottom, 120)
     }
 
     func header(_ s: Scenario) -> some View {
@@ -118,6 +131,7 @@ struct IncidentView: View {
                         Label("Reject", systemImage: "xmark").frame(maxWidth: .infinity).padding(.vertical, 6)
                     }
                     .buttonStyle(.glass)
+                    Group {
                     if model.scenario?.advisory == true {
                         Button { model.investigate() } label: {
                             HStack(spacing: 8) {
@@ -133,6 +147,7 @@ struct IncidentView: View {
                             Label("Approve", systemImage: "checkmark").fontWeight(.semibold)
                                 .frame(maxWidth: .infinity).padding(.vertical, 6)
                         }
+                    }
                     }
                     .buttonStyle(.glassProminent)
                     .tint(.white)
