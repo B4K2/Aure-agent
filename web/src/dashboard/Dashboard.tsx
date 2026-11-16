@@ -452,7 +452,8 @@ function Chat({ aura, incidentId, grow }: { aura: ReturnType<typeof useAura>; in
   const thinking = aura.thinking[thread]
   const box = useRef<HTMLDivElement>(null)
   // keep the newest message in view without scrolling the page itself
-  useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight }, [thread, msgs.length, thinking])
+  const last = msgs[msgs.length - 1]
+  useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight }, [thread, msgs.length, thinking, last?.text])
 
   const tab = (label: React.ReactNode, active: boolean, onClick: () => void, dot: boolean, disabled = false) => (
     <button
@@ -472,9 +473,19 @@ function Chat({ aura, incidentId, grow }: { aura: ReturnType<typeof useAura>; in
       style={{ flexGrow: grow }}
       title="Ask Aura"
       right={
+        <div className="flex items-center gap-2">
+        <button
+          onClick={() => { aura.newChat(thread === GENERAL ? undefined : thread); setText('') }}
+          disabled={msgs.length === 0}
+          title="Start a new chat in this thread"
+          className="rounded-full border border-white/10 px-2.5 py-0.5 text-[11px] text-neutral-400 transition-colors hover:text-white disabled:opacity-40"
+        >
+          + New chat
+        </button>
         <div className="flex gap-0.5 rounded-full border border-white/10 p-0.5">
           {tab(<span className="font-mono">{incidentId ?? 'Incident'}</span>, thread !== GENERAL, () => setGeneral(false), !!incidentId && !!aura.thinking[incidentId] && thread === GENERAL, !incidentId)}
           {tab('General', thread === GENERAL, () => setGeneral(true), !!aura.thinking[GENERAL] && thread !== GENERAL)}
+        </div>
         </div>
       }
     >
@@ -495,7 +506,7 @@ function Chat({ aura, incidentId, grow }: { aura: ReturnType<typeof useAura>; in
             )
           ),
         )}
-        {thinking && (
+        {thinking && last?.role !== 'aura' && (
           <div className="flex items-center gap-2 text-xs text-neutral-500">
             <LogoSpinner size={16} className="text-sky-300" />
             {thinking === 'thinking' ? 'Aura is thinking' : thinking}

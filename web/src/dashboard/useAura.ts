@@ -19,6 +19,7 @@ export function useAura(token: string | null) {
   const [opened, setOpened] = useState<string | null>(null) // newest incident, for auto-focus
   const ws = useRef<WebSocket | null>(null)
   const seq = useRef(0)
+  const streaming = useRef<Record<string, number>>({}) // thread → id of the Aura message receiving streamed text
 
   const log = (kind: FeedItem['kind'], text: string, at = new Date().toISOString(), incidentId?: string) =>
     setFeed((f) => [{ id: seq.current++, at, kind, text, incidentId }, ...f].slice(0, 200))
@@ -80,14 +81,32 @@ export function useAura(token: string | null) {
       case 'thinking':
         think(e.incident_id ?? GENERAL, 'thinking')
         break
+      case 'delta': {
+        const thread = e.incident_id ?? GENERAL
+        const sid = streaming.current[thread]
+        if (sid === undefined) {
+          const id = seq.current++
+          streaming.current[thread] = id
+          setChat((c) => ({ ...c, [thread]: [...(c[thread] || []), { id, role: 'aura', text: e.text }] }))
+        } else {
+          setChat((c) => ({ ...c, [thread]: (c[thread] || []).map((m) => (m.id === sid ? { ...m, text: m.text + e.text } : m)) }))
+        }
+        break
+      }
       case 'tool':
+        delete streaming.current[e.incident_id ?? GENERAL] // text before a tool call stays as its own message
         think(e.incident_id ?? GENERAL, e.name)
         say(e.incident_id ?? GENERAL, 'tool', `${e.name}(${JSON.stringify(e.args).slice(1, -1).slice(0, 100)})`)
         break
-      case 'answer':
-        think(e.incident_id ?? GENERAL, null)
-        say(e.incident_id ?? GENERAL, 'aura', e.text)
+      case 'answer': {
+        const thread = e.incident_id ?? GENERAL
+        const sid = streaming.current[thread]
+        delete streaming.current[thread]
+        think(thread, null)
+        if (sid === undefined) say(thread, 'aura', e.text)
+        else setChat((c) => ({ ...c, [thread]: (c[thread] || []).map((m) => (m.id === sid ? { ...m, text: e.text } : m)) }))
         break
+      }
       case 'system':
         log('system', e.text, e.at)
         break
@@ -112,6 +131,7 @@ export function useAura(token: string | null) {
       sock.onclose = (ev) => {
         if (closed) return
         setThinking({}) // any answer in flight died with the socket
+        streaming.current = {}
         if (ev.code === 4401) return setStatus('bad token')
         setStatus('reconnecting')
         retry = setTimeout(connect, 1500)
@@ -135,6 +155,14 @@ export function useAura(token: string | null) {
     status, watching, service, beats, incidents, stages, feed, chat, thinking, opened,
     ask: (text: string, incidentId?: string) => { say(incidentId ?? GENERAL, 'user', text); send({ type: 'chat', text, incident_id: incidentId }) },
     decide: (incidentId: string, decision: 'approved' | 'rejected', note = '') => send({ type: 'decide', incident_id: incidentId, decision, note }),
+    // New chat: clear the thread here and on the agent so the next question starts with no history
+    newChat: (incidentId?: string) => {
+      const thread = incidentId ?? GENERAL
+      delete streaming.current[thread]
+      think(thread, null)
+      setChat(({ [thread]: _, ...rest }) => rest)
+      send({ type: 'reset', incident_id: incidentId })
+    },
     load: (incidentId: string) => send({ type: 'get', incident_id: incidentId }),
   }
 }

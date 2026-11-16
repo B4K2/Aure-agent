@@ -78,3 +78,33 @@ def summarize(text: str) -> str:
 
 def chat(messages: list[dict], tools: list[dict]):
     return client().chat.completions.create(model=config.LLM_MODEL, messages=messages, tools=tools).choices[0].message
+
+
+def chat_stream(messages: list[dict], tools: list[dict], on_delta):
+    """Like chat(), but streams text via on_delta(str). Returns a message-shaped object (content, tool_calls)."""
+    from types import SimpleNamespace
+    stream = client().chat.completions.create(model=config.LLM_MODEL, messages=messages, tools=tools, stream=True)
+    text, calls = [], {}
+    for chunk in stream:
+        if not chunk.choices:
+            continue
+        d = chunk.choices[0].delta
+        if d.content:
+            text.append(d.content)
+            on_delta(d.content)
+        for tc in d.tool_calls or []:
+            c = calls.setdefault(tc.index, {"id": "", "name": "", "arguments": ""})
+            if tc.id:
+                c["id"] = tc.id
+            if tc.function and tc.function.name:
+                c["name"] += tc.function.name
+            if tc.function and tc.function.arguments:
+                c["arguments"] += tc.function.arguments
+
+    def call(c):
+        fn = SimpleNamespace(name=c["name"], arguments=c["arguments"])
+        dump = {"id": c["id"], "type": "function", "function": {"name": c["name"], "arguments": c["arguments"]}}
+        return SimpleNamespace(id=c["id"], function=fn, model_dump=lambda: dump)
+
+    tool_calls = [call(calls[i]) for i in sorted(calls)] or None
+    return SimpleNamespace(content="".join(text), tool_calls=tool_calls)
