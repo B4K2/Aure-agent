@@ -436,8 +436,18 @@ final class AuraModel {
         let actionText = [action["type"] as? String, action["target"] as? String].compactMap { $0 }
             .joined(separator: " → ").replacingOccurrences(of: "_", with: " ")
         let exec = inc["execution_result"] as? [String: Any]
-        let resolvedText = (exec?["summary"] as? String) ?? (exec?["detail"] as? String) ??
-            (inc["human_note"] as? String).map { "Rejected: \($0)" } ?? status.capitalized
+        func nonEmpty(_ v: Any?) -> String? {
+            guard let t = (v as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else { return nil }
+            return t
+        }
+        let outcome = nonEmpty(exec?["summary"]) ?? nonEmpty(exec?["detail"])
+        let note = nonEmpty(inc["human_note"])
+        let resolvedText: String = switch status {
+        case "resolved": outcome ?? (actionText.isEmpty ? "Fixed and verified" : "Applied: \(actionText)")
+        case "rejected": note.map { "You rejected the fix: \($0)" } ?? "You rejected the proposed fix"
+        case "unresolved": outcome ?? "Fix applied, but signals haven't recovered yet"
+        default: outcome ?? status.replacingOccurrences(of: "_", with: " ").capitalized
+        }
 
         var ev: [Evidence] = []
         for a in inc["anomalies_detected"] as? [[String: Any]] ?? [] {
