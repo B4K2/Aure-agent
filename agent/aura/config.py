@@ -63,6 +63,8 @@ API_PORT = int(os.getenv("AURA_API_PORT", "8700"))
 API_HOST = os.getenv("AURA_API_HOST", "127.0.0.1")  # 0.0.0.0 in a container
 
 POLL_SECONDS = float(os.getenv("AURA_POLL_SECONDS", "5"))
+# Ablation: AURA_MEMORY=off skips retrieval and write-back (deploy correlation, calibration rules unchanged)
+MEMORY_ENABLED = os.getenv("AURA_MEMORY", "on").lower() not in ("off", "0", "false")
 DEBOUNCE_SECONDS = 12         # §12: let a burst settle before enrichment
 CONFIDENCE_THRESHOLD = 0.75   # §8
 VERIFY_WINDOW_SECONDS = 120   # §13

@@ -1,0 +1,2 @@
+{"scenario": "bad-deploy-checkout-500", "trial": 1, "started": "2026-11-16T10:22:12.806892+00:00", "detector": "default", "memory": "off", "model": "muse-spark-1.3-contributor", "error": "could not reach a quiet, healthy baseline"}
+{"scenario": "bad-deploy-crash", "trial": 1, "started": "2026-11-16T10:32:14.647305+00:00", "detector": "default", "memory": "off", "model": "muse-spark-1.3-contributor", "error": "could not reach a quiet, healthy baseline"}
