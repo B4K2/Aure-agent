@@ -1,0 +1,7 @@
+
+> traffic
+> node traffic/simulate.js --users 20 --quiet
+
+[traffic] 20 virtual users (normal) -> http://localhost:4000, ramp 30s, duration until Ctrl-C
+2026-11-15T12:21:16.228Z [traffic] users=19 rps=104.1 p50=3ms p95=7ms p99=145ms 5xx=0 4xx=8 timeouts/conn=0 | total req=1041 sessions=49 signups=3 orders=3 abandoned=2 bounced=14
+[traffic] stopping (sessions finishing; Ctrl-C again to force)

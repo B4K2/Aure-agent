@@ -1,0 +1,9 @@
+/home/akshat/aura-project/agent/aura/main.py:263: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @api.on_event("startup")
+2026-11-15 17:50:40,587 aura INFO watching http://localhost:4000 every 5.0s
+ERROR:    [Errno 98] error while attempting to bind on address ('0.0.0.0', 8700): address already in use

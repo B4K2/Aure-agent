@@ -1,6 +1,7 @@
 """Post-Incident Learning Agent: write the outcome to both memories — rejected hypotheses included (§10)."""
 import logging
 
+from .. import config
 from ..memory import graph_db, vector_db
 from ..state import AuraState, audit, now
 from .enrichment import describe
@@ -20,6 +21,8 @@ def learning_node(state: AuraState) -> dict:
                                    describe(state))
     if state.get("human_note"):
         text += f" human said: {state['human_note']}"
+    if not config.MEMORY_ENABLED:  # ablation: nothing is remembered
+        return audit("learning", "remember", "skipped (AURA_MEMORY=off)")
     errors = []
     try:
         vector_db.upsert_incidents([{"incident_id": state["incident_id"], "service": state["service"],

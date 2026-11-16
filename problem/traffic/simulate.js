@@ -269,7 +269,13 @@ class VirtualUser {
       }
       case 'buyer': {
         if (PROFILE === 'flash-sale') {
-          // everyone wants the featured drop
+          // everyone wants the featured drop. Users who landed on a /product link (or whose home page
+          // failed) have no catalog yet: fetch it first, like the drop page would.
+          if (!this.catalog.length) {
+            const { data } = await this.req('/api/products');
+            if (Array.isArray(data)) this.catalog = data;
+          }
+          if (!this.catalog.length) break;  // site is failing; the user leaves
           const featured = this.catalog.filter((p) => p.featured);
           const p = await this.product(pick(featured.length ? featured : this.catalog));
           if (p) this.addToCart(p);

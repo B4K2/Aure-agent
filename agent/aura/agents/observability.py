@@ -6,21 +6,31 @@ import time
 import uuid
 from collections import defaultdict, deque
 
+import os
+
 import httpx
 from .. import config, db
 from ..runtime import runtime
 from ..state import Anomaly, now
 
-SIGMA = 4.0       # 5 s polling is noisy; 2σ fires on ordinary traffic jitter
+# AURA_DETECTOR=naive reproduces the early detector (2σ, no sd floor, no absolute floors, no sustain) so the
+# false-alarm evaluation (agent/eval/) can compare it against the default. Individual knobs override either.
+NAIVE = os.getenv("AURA_DETECTOR", "default").lower() == "naive"
+SIGMA = float(os.getenv("AURA_SIGMA", 2.0 if NAIVE else 4.0))  # 5 s polling is noisy; 2σ fires on ordinary traffic jitter
 WARMUP = 12       # samples (~1 min) before σ-based checks start
 WINDOW = 120      # ~10 min rolling baseline
-MIN_SD_FRAC = 0.15  # a very steady baseline would make tiny moves look like 20σ; floor sd at 15% of the mean
+# a very steady baseline would make tiny moves look like 20σ; floor sd at 15% of the mean
+MIN_SD_FRAC = float(os.getenv("AURA_MIN_SD_FRAC", 0.0 if NAIVE else 0.15))
+USE_FLOORS = os.getenv("AURA_ABS_FLOORS", "0" if NAIVE else "1") == "1"
 
 # A candidate only becomes an anomaly after this many consecutive polls (5 s each). Short blips — a burst of
 # new users doing full page loads, one slow request — never page anyone.
 SUSTAIN = {"health": 2, "db_container": 1, "db_reachable": 2, "error_logs": 2,
            "pg_lock_waits": 1}  # LOCK_WAIT_LONG_S already filters blips
 SUSTAIN_DEFAULT = 3
+if os.getenv("AURA_SUSTAIN", "1" if NAIVE else "") != "":
+    SUSTAIN = {}
+    SUSTAIN_DEFAULT = int(os.getenv("AURA_SUSTAIN", "1"))
 MIN_ERROR_LINES = 3  # per poll, for the log signal
 # A request stuck behind a lock never finishes, so it never shows up in latency, 5xx or the access log.
 # With light traffic there may be just one or two of them; how long they've waited is the signal.
@@ -174,7 +184,7 @@ class Observer:
         mean = statistics.fmean(h)
         sd = max(statistics.pstdev(h), abs(mean) * MIN_SD_FRAC, 1e-9)
         sigma = (value - mean) / sd
-        if sigma > SIGMA and value - mean > floor:
+        if sigma > SIGMA and value - mean > (floor if USE_FLOORS else 0):
             return _anomaly("metric", f"{name} = {value:.3g} vs baseline {mean:.3g} ({sigma:.1f}σ)", name, value, mean, sigma)
         return None
 

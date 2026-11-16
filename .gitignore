@@ -27,3 +27,7 @@ test-website/
 .vscode/
 .riftguard/local/
 .claude/settings.local.json
+
+# paper drafts
+paper/
+research_paper.pdf

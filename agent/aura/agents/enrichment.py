@@ -68,20 +68,21 @@ def enrichment_node(state: AuraState) -> dict:
         ctx["suspect_diff"] = full_diff(suspect["hash"])[:4000]  # the reasoner needs to see what changed
 
     memories = {"confirmed": [], "rejected": [], "causal": [], "frequency": [], "impact": [], "errors": []}
-    try:
-        memories.update(vector_db.search_incidents(describe(state), state["service"]))
-    except Exception as e:
-        memories["errors"].append(f"qdrant: {e}")
-    try:
-        for c in commits[:3]:
-            graph_db.record_deployment(state["service"], c)
-        memories["causal"] = graph_db.causal_history(state["service"])
-        memories["frequency"] = graph_db.root_cause_frequency(state["service"])
-        memories["impact"] = graph_db.impact(state["service"])
-    except Exception as e:
-        memories["errors"].append(f"neo4j: {e}")
-    for e in memories["errors"]:
-        log.warning("memory unavailable: %s", e)
+    if config.MEMORY_ENABLED:
+        try:
+            memories.update(vector_db.search_incidents(describe(state), state["service"]))
+        except Exception as e:
+            memories["errors"].append(f"qdrant: {e}")
+        try:
+            for c in commits[:3]:
+                graph_db.record_deployment(state["service"], c)
+            memories["causal"] = graph_db.causal_history(state["service"])
+            memories["frequency"] = graph_db.root_cause_frequency(state["service"])
+            memories["impact"] = graph_db.impact(state["service"])
+        except Exception as e:
+            memories["errors"].append(f"neo4j: {e}")
+        for e in memories["errors"]:
+            log.warning("memory unavailable: %s", e)
 
     return {"deployment_context": ctx, "correlation": corr, "retrieved_memories": memories,
             **audit("enrichment", "correlate+retrieve",
