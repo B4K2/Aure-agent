@@ -88,7 +88,7 @@ class Conversation:
             return f"proposed. dry run:\n{dry_run(action)}\nTell the user to /approve if they agree."
         return f"unknown tool {name}"
 
-    def send(self, text: str, incident_id: str | None) -> str:
+    def send(self, text: str, incident_id: str | None, on_delta=None) -> str:
         focus = ""
         if incident_id and (inc := self.ctx.get_incident(incident_id)):
             focus = "Incident in focus:\n" + json.dumps({k: inc.get(k) for k in
@@ -97,7 +97,14 @@ class Conversation:
         history.append({"role": "user", "content": text})
         msgs = [{"role": "system", "content": SYSTEM.format(url=config.VOID_URL, focus=focus)}] + history[-30:]
         for _ in range(8):
-            msg = llm.chat(msgs, TOOLS)
+            if on_delta:
+                try:
+                    msg = llm.chat_stream(msgs, TOOLS, on_delta)
+                except Exception:
+                    on_delta = None  # provider can't stream: fall back to one-shot
+                    msg = llm.chat(msgs, TOOLS)
+            else:
+                msg = llm.chat(msgs, TOOLS)
             if not msg.tool_calls:
                 answer = msg.content or ""
                 history.append({"role": "assistant", "content": answer})

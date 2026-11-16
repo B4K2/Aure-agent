@@ -352,11 +352,15 @@ async def ws(sock: WebSocket):
             if msg.get("type") == "chat":
                 iid = msg.get("incident_id") or None  # None = the general thread
                 await sock.send_json({"type": "thinking", "incident_id": iid, "at": now()})
+                def delta(t, iid=iid):  # runs on the worker thread; hop back to the loop to send
+                    asyncio.run_coroutine_threadsafe(sock.send_json({"type": "delta", "text": t, "incident_id": iid}), loop)
                 try:
-                    answer = await loop.run_in_executor(aura.pool, convo.send, msg["text"], iid)
+                    answer = await loop.run_in_executor(aura.pool, convo.send, msg["text"], iid, delta)
                 except Exception as e:
                     answer = f"(LLM error: {e})"
                 await sock.send_json({"type": "answer", "text": answer, "incident_id": iid, "at": now()})
+            elif msg.get("type") == "reset":  # "New chat" in the app: forget this thread's history
+                convo.threads.pop(msg.get("incident_id") or None, None)
             elif msg.get("type") == "decide":
                 try:
                     aura.decide(msg["incident_id"], msg["decision"], msg.get("note") or "")

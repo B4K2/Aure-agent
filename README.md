@@ -26,25 +26,61 @@ The demo target site ("VOID" shop) lives in `problem/website-template/`. `npm ru
 
 Prerequisites: Docker, Python 3.12 + [`uv`](https://docs.astral.sh/uv/), Node.js 20+, an NVIDIA GPU (CUDA 12.8 wheels) for local embeddings.
 
+### First time only
+
 ```bash
-# 1. Memory stores (Qdrant :6333, Neo4j :7474)
 cd agent
-cp .env.example .env            # fill in API keys / passwords
-docker compose up -d
-
-# 2. Agent deps + seed memory (once)
+cp .env.example .env              # fill in LLM_API_KEY, NEO4J_PASSWORD, HUGGING_FACE_TOKEN
+                                  # add AURA_API_HOST=0.0.0.0 if a phone/iOS app must connect (agent/README.md)
 uv sync
-uv run python -m aura.memory.seed
-
-# 3. Create and start the demo site (test-website/ is generated, local-only git repo)
-(cd ../problem && npm install && npm run setup-website)
-(cd ../test-website && npm install && docker compose up -d db && npm start)
-
-# 4. Launch the UI (starts the agent server if it isn't running)
-cd ../aura-cli && npm install && npm start
+docker compose up -d && uv run python -m aura.memory.seed      # runbooks + seed incidents
+(cd ../problem && npm install && npm run setup-website)          # generates ../test-website (local git repo)
+(cd ../test-website && npm install)
+(cd ../aura-cli && npm install)
+(cd ../web && npm install)
 ```
 
-Run the server on its own: `cd agent && uv run python -m aura.main`
+### Turning everything on (in this order)
+
+Each long-running step gets its own terminal. Run every command from the repo root.
+
+| # | Terminal | Command | Ready when |
+|---|---|---|---|
+| 1 | any | `(cd agent && docker compose up -d)` | Qdrant on `:6333`, Neo4j on `:7474` (Neo4j takes ~20 s) |
+| 2 | any | `(cd test-website && docker compose up -d db)` | Postgres on `:5433`; `docker ps` shows *healthy* |
+| 3 | **T1** | `cd test-website && npm start` | `curl localhost:4000/api/health` returns 200 |
+| 4 | **T2** | `cd agent && uv run python -m aura.main` | log says `embedding model loaded` |
+| 5 | **T3** | `cd problem && npm run traffic -- --users 20` | stats line every 10 s; wait ~1 min for baselines to warm up |
+| 6 | **T4** | `cd aura-cli && npm start` | header shows the watched site; type `/web` for a dashboard link |
+| 7 | T5 (optional) | `cd web && npm run dev` | dashboard at http://localhost:5173/dashboard |
+
+Notes:
+- Start the server yourself (step 4) **before** the CLI. If the CLI finds no server, it starts one in the
+  background, and it restarts the server every time it loses it. So don't kill the server while the CLI
+  is open. Settings such as `AURA_API_HOST` belong in `agent/.env`, which every start reads, not on the command line.
+- "Port 4000 is already in use" at step 3 means the site is already running (`node inject.js recover`
+  restarts it in the background). That's fine: check with `curl localhost:4000/api/health`.
+- On Kubernetes instead of Docker, steps 2–3 become `bash problem/k8s/up.sh` (see `problem/README.md`).
+
+Check everything at once:
+
+```bash
+docker ps --format '{{.Names}} {{.Status}}' | grep -E 'agent-|test-website'
+curl -s -o /dev/null -w 'site %{http_code}\n' localhost:4000/api/health
+curl -s -o /dev/null -w 'aura %{http_code}\n' -H "x-aura-token: $(cat agent/.aura_state/api_token)" localhost:8700/incidents
+ss -ltn | grep 8700                 # 127.0.0.1:8700 = local only; 0.0.0.0:8700 = reachable from the LAN
+(cd problem && node inject.js status)
+```
+
+### Turning everything off
+
+```bash
+(cd problem && node inject.js recover all)        # undo any injected fault first
+# Ctrl-C in T1–T5 (the CLI first, so it doesn't respawn the server), or:
+pkill -f 'aura-cli/node_modules/.bin/tsx'; pkill -f 'python -m aura.main'; pkill -f 'traffic/simulate.js'
+kill $(lsof -t -i:4000) 2>/dev/null               # the VOID site
+(cd agent && docker compose stop); (cd test-website && docker compose stop)   # keeps data; `down -v` wipes it
+```
 
 ## Web dashboard
 
