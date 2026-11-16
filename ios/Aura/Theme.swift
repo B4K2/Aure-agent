@@ -6,10 +6,10 @@ enum Theme {
 
     static let dim = Color.white.opacity(0.6)
     static let faint = Color.white.opacity(0.4)
-    // Black and white only: state is carried by icons and weight, not hue.
-    static let ok = Color.white
-    static let bad = Color.white
-    static let warn = Color.white.opacity(0.85)
+    // Mostly black and white; hue only where it carries state.
+    static let ok = Color(red: 0.35, green: 0.85, blue: 0.55)
+    static let bad = Color(red: 1.0, green: 0.36, blue: 0.36)
+    static let warn = Color(red: 1.0, green: 0.72, blue: 0.3)
 }
 
 extension Font {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct Metrics {
     var rps: Double, p95: Double, err: Double, rss: Double, db: Double
+    var at = Date()
     static let base = Metrics(rps: 42, p95: 120, err: 0.2, rss: 180, db: 14)
 }
 
@@ -112,7 +113,7 @@ final class AuraModel {
         enum Role { case me, aura, tool }
         let id = UUID()
         let role: Role
-        let text: String
+        var text: String
     }
 
     var mode: Mode = Mode(rawValue: UserDefaults.standard.string(forKey: "aura.mode") ?? "") ?? .demo
@@ -132,6 +133,8 @@ final class AuraModel {
     /// Chat threads keyed by incident id; "" is the general thread.
     var threads: [String: [ChatMsg]] = [:]
     var waiting: Set<String> = []
+    /// The Aura bubble currently receiving streamed text, per thread.
+    private var streaming: [String: UUID] = [:]
 
     private var target = Metrics.base
     private var ticking = false
@@ -145,6 +148,7 @@ final class AuraModel {
     // MARK: lifecycle
 
     func start() async {
+        Notifier.setUp()
         if mode == .live { connect() }
         guard !ticking else { return }
         ticking = true
@@ -255,6 +259,17 @@ final class AuraModel {
         send(msg)
     }
 
+    /// "New chat": drop this thread here and on the agent so the next question starts fresh.
+    func newChat(incident: String?) {
+        let key = incident ?? ""
+        threads[key] = []
+        waiting.remove(key)
+        streaming[key] = nil
+        var msg: [String: Any] = ["type": "reset"]
+        if let incident { msg["incident_id"] = incident }
+        send(msg)
+    }
+
     /// Same prompt the CLI's /investigate sends: Aura digs in with its tools and proposes an executable fix.
     func investigate() {
         guard mode == .live, let s = scenario else { return }
@@ -338,6 +353,7 @@ final class AuraModel {
         case "incident_opened":
             guard let iid = ev["incident_id"] as? String else { return }
             liveIncident = iid
+            Notifier.post("Incident opened", "Aura is investigating \(iid)", id: iid + "-open")
             withAnimation(.spring) {
                 scenario = liveScenario(iid, summary: "Collecting signals…")
                 shown = []
@@ -364,16 +380,37 @@ final class AuraModel {
             guard let name = ev["name"] as? String else { return }
             let key = ev["incident_id"] as? String ?? ""
             let pretty = name.replacingOccurrences(of: "_", with: " ")
-            if waiting.contains(key) { threads[key, default: []].append(ChatMsg(role: .tool, text: pretty)) }
+            if waiting.contains(key) {
+                streaming[key] = nil  // text before a tool call stays as its own bubble
+                threads[key, default: []].append(ChatMsg(role: .tool, text: pretty))
+            }
             if thinking, key == scenario?.id {
                 withAnimation(.spring) { shown.append(Evidence(kind: .evidence, label: "tool", text: pretty)) }
             }
+        case "delta":
+            let key = ev["incident_id"] as? String ?? ""
+            guard waiting.contains(key), let t = ev["text"] as? String else { return }
+            var msgs = threads[key, default: []]
+            if let sid = streaming[key], let i = msgs.firstIndex(where: { $0.id == sid }) {
+                msgs[i].text += t
+            } else {
+                let m = ChatMsg(role: .aura, text: t)
+                streaming[key] = m.id
+                msgs.append(m)
+            }
+            threads[key] = msgs
         case "answer":
             let key = ev["incident_id"] as? String ?? ""
             let text = ev["text"] as? String ?? ""
             if waiting.contains(key) {
                 waiting.remove(key)
-                threads[key, default: []].append(ChatMsg(role: .aura, text: text))
+                var msgs = threads[key, default: []]
+                if let sid = streaming.removeValue(forKey: key), let i = msgs.firstIndex(where: { $0.id == sid }) {
+                    msgs[i].text = text
+                } else {
+                    msgs.append(ChatMsg(role: .aura, text: text))
+                }
+                threads[key] = msgs
             } else if thinking, key == scenario?.id {
                 thinking = false
                 withAnimation(.spring) { shown.append(Evidence(kind: .hypothesis, label: "Aura", text: text)) }
@@ -381,7 +418,9 @@ final class AuraModel {
         case "error":
             thinking = false
             waiting.removeAll()
+            streaming.removeAll()
             lastError = ev["message"] as? String
+            Notifier.post("Aura error", lastError ?? "Something went wrong", id: "err-\(Date().timeIntervalSince1970)")
             if phase == .fixing { phase = .proposed }
         default: break
         }
@@ -415,6 +454,7 @@ final class AuraModel {
                          target: .base, evidence: ev, confidence: (rca["calibrated_confidence"] as? NSNumber)?.doubleValue ?? 0,
                          action: actionText.isEmpty ? "Investigating" : actionText, resolved: resolvedText,
                          advisory: ["investigate_further", "scale"].contains(action["type"] as? String ?? ""))
+        notify(iid: iid, status: status, action: actionText, result: resolvedText)
         withAnimation(.spring) {
             scenario = s
             if !ev.isEmpty { shown = ev + shown.filter { $0.label == "Aura" || $0.label == "tool" } }
@@ -429,6 +469,16 @@ final class AuraModel {
                 }
             default: phase = .investigating
             }
+        }
+    }
+
+    /// One banner per incident state change (the id dedupes repeats of the same state).
+    private func notify(iid: String, status: String, action: String, result: String) {
+        switch status {
+        case "awaiting_approval": Notifier.post("Fix ready for approval", action.isEmpty ? iid : action, id: "\(iid)-\(status)")
+        case "resolved": Notifier.post("Resolved", result, id: "\(iid)-\(status)")
+        case "rejected", "unresolved": Notifier.post("Incident \(status)", result, id: "\(iid)-\(status)")
+        default: break
         }
     }
 

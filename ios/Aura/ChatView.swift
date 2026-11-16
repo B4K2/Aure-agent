@@ -25,7 +25,7 @@ struct ChatView: View {
                     LazyVStack(spacing: 12) {
                         if messages.isEmpty { intro }
                         ForEach(messages) { m in bubble(m).id(m.id) }
-                        if waiting {
+                        if waiting, messages.last?.role != .aura {
                             HStack(spacing: 10) {
                                 LogoMark(size: 16, lapSeconds: 0.9)
                                 Text("Aura is thinking…").font(.footnote).foregroundStyle(Theme.dim)
@@ -38,12 +38,20 @@ struct ChatView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onChange(of: messages.count) { scrollToBottom(proxy) }
+                .onChange(of: messages.last?.text) { scrollToBottom(proxy, animated: false) }
                 .onChange(of: waiting) { scrollToBottom(proxy) }
             }
             .background(AppBackground())
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("New chat", systemImage: "square.and.pencil") {
+                        draft = ""
+                        model.newChat(incident: incident)
+                    }
+                    .disabled(messages.isEmpty)
+                }
                 if inSheet {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Done", systemImage: "checkmark") { dismiss() }
@@ -57,8 +65,8 @@ struct ChatView: View {
         }
     }
 
-    func scrollToBottom(_ proxy: ScrollViewProxy) {
-        withAnimation {
+    func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool = true) {
+        withAnimation(animated ? .default : nil) {
             if waiting { proxy.scrollTo("waiting", anchor: .bottom) }
             else if let last = messages.last { proxy.scrollTo(last.id, anchor: .bottom) }
         }
@@ -100,7 +108,7 @@ struct ChatView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         case .aura:
             HStack {
-                Text((try? AttributedString(markdown: m.text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(m.text))
+                MarkdownText(text: m.text)
                     .textSelection(.enabled)
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .glassEffect(.regular, in: .rect(cornerRadius: 20))

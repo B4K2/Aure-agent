@@ -5,11 +5,13 @@ struct HomeView: View {
     @Environment(AuraModel.self) var model
     var openIncident: () -> Void
     @State var showConnect = false
+    @State var detail: MetricKind?
 
     var dotColor: Color {
         switch model.link {
-        case .live: .white
-        case .connecting: .white.opacity(0.5)
+        case .live: Theme.ok
+        case .failed: Theme.bad
+        case .connecting: Theme.warn
         default: .white.opacity(model.isLive ? 0.2 : 0.5)
         }
     }
@@ -30,6 +32,7 @@ struct HomeView: View {
             .scrollIndicators(.hidden)
             .background(AppBackground())
             .sheet(isPresented: $showConnect) { ConnectView() }
+            .sheet(item: $detail) { MetricDetailView(metric: $0).presentationDetents([.large]) }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showConnect = true } label: {
@@ -67,10 +70,13 @@ struct HomeView: View {
             Eyebrow(text: model.isLive ? "Live · your service" : "Demo shop")
             let h = model.history
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                MetricTile(name: "Traffic", value: "\(Int(model.now.rps)) rps", values: h.map(\.rps), alert: model.now.rps > 200)
-                MetricTile(name: "p95 latency", value: "\(Int(model.now.p95)) ms", values: h.map(\.p95), alert: model.now.p95 > 300)
-                MetricTile(name: "Errors", value: String(format: "%.1f%%", model.now.err), values: h.map(\.err), alert: model.now.err > 2)
-                MetricTile(name: "Memory", value: "\(Int(model.now.rss)) MB", values: h.map(\.rss), alert: model.now.rss > 500)
+                ForEach([MetricKind.rps, .p95, .err, .rss]) { k in
+                    let v = k.value(model.now)
+                    Button { detail = k } label: {
+                        MetricTile(name: k.name, value: k.format(v), values: h.map(k.value), alert: k.alert(v))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }
@@ -140,18 +146,25 @@ struct StatusCard: View {
     @Environment(AuraModel.self) var model
     var openIncident: () -> Void
 
+    var isConnected: Bool { if case .live = model.link { true } else { false } }
+
     var watching: String {
+        if case .failed(let why) = model.link { return why }
         if case .live(let w) = model.link { return "Watching \(w)" }
         return "Not connected"
     }
 
     var body: some View {
         let (title, sub, color, icon): (String, String, Color, String) = switch model.phase {
-        case .healthy: ("All systems normal", model.isLive ? watching : "Demo mode · scripted on this phone", Theme.ok, "checkmark.seal.fill")
-        case .investigating: ("Investigating", model.scenario?.summary ?? "", Theme.warn, "magnifyingglass")
+        case .healthy: model.isLive && !isConnected
+            ? ("Not connected", watching, Theme.bad, "exclamationmark.triangle.fill")
+            : ("All systems normal", model.isLive ? watching : "Demo mode · scripted on this phone", Theme.ok, "checkmark.seal.fill")
+        case .investigating: ("Investigating", model.scenario?.summary ?? "", Theme.bad, "magnifyingglass")
         case .proposed: ("Fix ready for approval", model.scenario?.action ?? "", Theme.warn, "hand.raised.fill")
         case .fixing: ("Applying fix", model.scenario?.action ?? "", Theme.warn, "gearshape.2.fill")
-        case .resolved: ("Resolved", model.records.first?.note ?? "", Theme.ok, "checkmark.circle.fill")
+        case .resolved: model.records.first?.approved == false
+            ? ("Not fixed", model.records.first?.note ?? "", Theme.bad, "xmark.octagon.fill")
+            : ("Resolved", model.records.first?.note ?? "", Theme.ok, "checkmark.circle.fill")
         }
         Button(action: openIncident) {
             HStack(spacing: 14) {
@@ -180,7 +193,11 @@ struct MetricTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(name).font(.caption).foregroundStyle(Theme.dim)
+            HStack {
+                Text(name).font(.caption).foregroundStyle(Theme.dim)
+                Spacer()
+                Image(systemName: "arrow.up.left.and.arrow.down.right").font(.caption2).foregroundStyle(Theme.faint)
+            }
             Text(value).font(.title3.weight(.semibold)).monospacedDigit()
                 .foregroundStyle(alert ? Theme.bad : .white)
                 .contentTransition(.numericText())
@@ -189,7 +206,8 @@ struct MetricTile: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        .contentShape(.rect)
+        .glassEffect(alert ? .regular.tint(Theme.bad.opacity(0.18)).interactive() : .regular.interactive(), in: .rect(cornerRadius: 22))
         .animation(.easeOut(duration: 0.4), value: value)
     }
 }
